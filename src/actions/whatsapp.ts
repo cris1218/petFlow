@@ -39,6 +39,7 @@ export async function pairWhatsApp() {
       mocked: qr.mocked,
       qrBase64: qr.qrBase64,
       pairingCode: qr.pairingCode,
+      missing: qr.missing,
     };
   } catch (error) {
     console.error("[pairWhatsApp]", error);
@@ -62,12 +63,16 @@ export async function refreshWhatsAppQr() {
     }
 
     const qr = await getWhatsAppQr(instanceName);
+    if (qr.missing) {
+      return pairWhatsApp();
+    }
     return {
       ok: true as const,
       instanceName,
       mocked: qr.mocked,
       qrBase64: qr.qrBase64,
       pairingCode: qr.pairingCode,
+      missing: false,
     };
   } catch (error) {
     console.error("[refreshWhatsAppQr]", error);

@@ -32,35 +32,39 @@ export function WhatsAppQrCard({
   const [status, setStatus] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  async function requestQr(refresh: boolean) {
+  async function requestQr(refresh: boolean): Promise<"qr" | "wait" | "error"> {
     const result = refresh ? await refreshWhatsAppQr() : await pairWhatsApp();
     if (!result.ok) {
       setError(result.error ?? "Não foi possível gerar o QR Code.");
-      return false;
+      setStatus(null);
+      return "error";
     }
     setMocked(result.mocked);
     if (result.qrBase64) {
       setQr(result.qrBase64);
       setStatus(null);
-      return true;
+      return "qr";
     }
     setStatus("A Evolution está gerando o QR. Tentando de novo…");
-    return false;
+    return "wait";
   }
 
   function loadQr(refresh = false) {
     startTransition(async () => {
       setError(null);
-      const gotQr = await requestQr(refresh);
-      if (gotQr) return;
+      const first = await requestQr(refresh);
+      if (first !== "wait") return;
 
       for (let attempt = 0; attempt < 8; attempt += 1) {
         await new Promise((resolve) => setTimeout(resolve, 2000));
-        const got = await requestQr(true);
-        if (got) return;
+        const next = await requestQr(true);
+        if (next !== "wait") return;
       }
 
-      setError("QR ainda não chegou. Confira SERVER_URL no Railway e clique em Atualizar.");
+      setError(
+        "QR ainda não chegou. Clique em Gerar QR Code de novo. Se persistir, no Railway da Evolution confira SERVER_URL=https://evolution-api-production-98c1.up.railway.app",
+      );
+      setStatus(null);
     });
   }
 

@@ -55,6 +55,13 @@ type EvolutionPayload = {
   instance?: { status?: string; state?: string; instanceName?: string };
 };
 
+type EvolutionResult = {
+  ok: boolean;
+  status: number;
+  mocked: boolean;
+  data: EvolutionPayload | null;
+};
+
 function extractQr(data: EvolutionPayload | null) {
   const qrBase64 = data?.base64 ?? data?.qrcode?.base64 ?? null;
   const pairingCode =
@@ -74,10 +81,10 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function evolutionFetch(path: string, init?: RequestInit) {
+async function evolutionRequest(path: string, init?: RequestInit): Promise<EvolutionResult> {
   if (!evolutionConfigured()) {
     console.info("[whatsapp:mock]", path, init?.body);
-    return { ok: true, mocked: true, data: null as EvolutionPayload | null };
+    return { ok: true, status: 200, mocked: true, data: null };
   }
 
   let response: Response;
@@ -97,33 +104,89 @@ async function evolutionFetch(path: string, init?: RequestInit) {
   }
 
   const data = (await response.json().catch(() => null)) as EvolutionPayload | null;
+  return { ok: response.ok, status: response.status, mocked: false, data };
+}
 
-  if (!response.ok) {
-    throw new Error(
-      `Evolution API ${response.status}: ${JSON.stringify(data)}`,
-    );
+async function evolutionFetch(path: string, init?: RequestInit) {
+  const result = await evolutionRequest(path, init);
+  if (!result.ok && !result.mocked) {
+    throw new Error(`Evolution API ${result.status}: ${JSON.stringify(result.data)}`);
   }
+  return result;
+}
 
-  return { ok: true, mocked: false, data };
+function isMissingInstance(result: EvolutionResult) {
+  const payload = JSON.stringify(result.data ?? "");
+  return result.status === 404 || /does not exist/i.test(payload);
 }
 
 export async function getWhatsAppQr(instanceName: string) {
-  const result = await evolutionFetch(`/instance/connect/${instanceName}`);
-  return { mocked: result.mocked, ...extractQr(result.data) };
+  const result = await evolutionRequest(`/instance/connect/${instanceName}`);
+  if (result.mocked) {
+    return { mocked: true, missing: false, qrBase64: null, pairingCode: null };
+  }
+  if (isMissingInstance(result)) {
+    return { mocked: false, missing: true, qrBase64: null, pairingCode: null };
+  }
+  if (!result.ok) {
+    throw new Error(`Evolution API ${result.status}: ${JSON.stringify(result.data)}`);
+  }
+  return { mocked: false, missing: false, ...extractQr(result.data) };
 }
 
-async function deleteInstance(instanceName: string) {
+function instanceNameOf(item: unknown) {
+  if (!item || typeof item !== "object") return null;
+  const record = item as Record<string, unknown>;
+  if (typeof record.name === "string") return record.name;
+  if (typeof record.instanceName === "string") return record.instanceName;
+  const nested = record.instance;
+  if (nested && typeof nested === "object") {
+    const inner = nested as Record<string, unknown>;
+    if (typeof inner.instanceName === "string") return inner.instanceName;
+    if (typeof inner.name === "string") return inner.name;
+  }
+  return null;
+}
+
+async function instanceExists(instanceName: string) {
   try {
-    await evolutionFetch(`/instance/delete/${instanceName}`, { method: "DELETE" });
+    const result = await evolutionRequest("/instance/fetchInstances");
+    const raw = result.data as unknown;
+    const list = Array.isArray(raw)
+      ? raw
+      : raw && typeof raw === "object" && Array.isArray((raw as { instance?: unknown }).instance)
+        ? ((raw as { instance: unknown[] }).instance)
+        : [];
+    return list.some((item) => instanceNameOf(item) === instanceName);
   } catch {
-    // instância pode não existir
+    return false;
   }
 }
 
-export async function ensureWhatsAppInstance(instanceName: string) {
-  await deleteInstance(instanceName);
+async function getConnectionState(instanceName: string) {
+  const result = await evolutionRequest(`/instance/connectionState/${instanceName}`);
+  if (isMissingInstance(result)) return null;
+  return result.data?.instance?.state ?? result.data?.instance?.status ?? null;
+}
 
-  const created = await evolutionFetch("/instance/create", {
+async function logoutInstance(instanceName: string) {
+  const deleted = await evolutionRequest(`/instance/logout/${instanceName}`, {
+    method: "DELETE",
+  });
+  if (deleted.ok || isMissingInstance(deleted)) return;
+  await evolutionRequest(`/instance/logout/${instanceName}`, { method: "PUT" });
+}
+
+async function restartInstance(instanceName: string) {
+  const put = await evolutionRequest(`/instance/restart/${instanceName}`, {
+    method: "PUT",
+  });
+  if (put.ok) return;
+  await evolutionRequest(`/instance/restart/${instanceName}`, { method: "POST" });
+}
+
+async function createInstance(instanceName: string) {
+  return evolutionRequest("/instance/create", {
     method: "POST",
     body: JSON.stringify({
       instanceName,
@@ -131,23 +194,55 @@ export async function ensureWhatsAppInstance(instanceName: string) {
       integration: "WHATSAPP-BAILEYS",
     }),
   });
+}
 
-  const fromCreate = extractQr(created.data);
-  if (fromCreate.qrBase64) {
-    return { mocked: false, ...fromCreate };
-  }
-
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+async function pollQr(instanceName: string, attempts = 3) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
     await sleep(800);
     const qr = await getWhatsAppQr(instanceName);
     if (qr.qrBase64) return qr;
+    if (qr.missing) break;
+  }
+  return getWhatsAppQr(instanceName);
+}
+
+export async function ensureWhatsAppInstance(instanceName: string) {
+  const exists = await instanceExists(instanceName);
+
+  if (!exists) {
+    const created = await createInstance(instanceName);
+    if (!created.ok && !/already|exist/i.test(JSON.stringify(created.data ?? ""))) {
+      throw new Error(`Evolution API ${created.status}: ${JSON.stringify(created.data)}`);
+    }
+    const fromCreate = extractQr(created.data);
+    if (fromCreate.qrBase64) {
+      return { mocked: false, missing: false, ...fromCreate };
+    }
+    return pollQr(instanceName);
   }
 
-  return {
-    mocked: false,
-    qrBase64: null,
-    pairingCode: null,
-  };
+  const state = await getConnectionState(instanceName);
+
+  if (state === "open") {
+    return { mocked: false, missing: false, qrBase64: null, pairingCode: null };
+  }
+
+  // connecting + QR vazio, ou instância só no banco (404 no waMonitor):
+  // logout/restart tira do estado preso sem apagar a instância.
+  if (!state) {
+    await restartInstance(instanceName);
+  } else {
+    await logoutInstance(instanceName);
+  }
+
+  await sleep(800);
+  const qr = await getWhatsAppQr(instanceName);
+  if (qr.qrBase64) return qr;
+  if (qr.missing) {
+    await restartInstance(instanceName);
+    await sleep(800);
+  }
+  return pollQr(instanceName);
 }
 
 export async function sendWhatsAppText(input: {
