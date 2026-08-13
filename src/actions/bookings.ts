@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { VaccineStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createBookingSchema } from "@/lib/validations";
-import { calculateStayPricing, serializeMoney } from "@/lib/pricing";
-import { createPixDeposit } from "@/lib/mercadopago";
+import { calculateStayPricing, ratesFromTenant, serializeMoney } from "@/lib/pricing";
+import { createPixDeposit, resolveMercadoPagoToken } from "@/lib/mercadopago";
 import { vaccineStatusFromExpiration } from "@/lib/utils";
 import { requireStaffSession } from "@/lib/auth";
 import { assertOwnedBooking } from "@/lib/tenant";
@@ -67,6 +67,7 @@ export async function createBooking(input: CreateBookingInput) {
     data.serviceType,
     data.startDate,
     data.endDate,
+    ratesFromTenant(tenant),
   );
 
   const expiredVaccines = data.vaccines.filter(
@@ -143,17 +144,33 @@ export async function createBooking(input: CreateBookingInput) {
     });
   });
 
-  const pix = await createPixDeposit({
-    bookingId: booking.id,
-    amount: pricing.depositAmount,
-    description: `Sinal PetFlow · ${SERVICE_LABELS[data.serviceType]} · ${booking.pet.name}`,
-    payerEmail: data.tutor.email ?? `tutor-${booking.pet.tutor.id}@petflow.app`,
-  });
+  const accessToken = resolveMercadoPagoToken(tenant);
+  let pix: {
+    paymentId: string;
+    qrCode: string;
+    qrCodeBase64: string;
+    ticketUrl?: string;
+  } | null = null;
 
-  await prisma.booking.update({
-    where: { id: booking.id },
-    data: { mpPaymentId: pix.paymentId },
-  });
+  if (accessToken) {
+    try {
+      pix = await createPixDeposit({
+        accessToken,
+        bookingId: booking.id,
+        amount: pricing.depositAmount,
+        description: `Sinal PetFlow · ${SERVICE_LABELS[data.serviceType]} · ${booking.pet.name}`,
+        payerEmail: data.tutor.email ?? `tutor-${booking.pet.tutor.id}@petflow.app`,
+      });
+
+      await prisma.booking.update({
+        where: { id: booking.id },
+        data: { mpPaymentId: pix.paymentId },
+      });
+    } catch (error) {
+      console.error("[createBooking] pix", error);
+      pix = null;
+    }
+  }
 
   return {
     ok: true as const,
@@ -168,7 +185,7 @@ export async function createBooking(input: CreateBookingInput) {
   };
 }
 
-export async function simulatePixPayment(bookingId: string) {
+export async function confirmPaidBooking(bookingId: string) {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
     include: {
@@ -177,14 +194,11 @@ export async function simulatePixPayment(bookingId: string) {
     },
   });
 
-  if (!booking?.mpPaymentId?.startsWith("mock_")) {
-    return {
-      ok: false as const,
-      error: "Pagamento de demonstração indisponível.",
-    };
+  if (!booking) {
+    return { ok: false as const, error: "Reserva não encontrada." };
   }
 
-  if (booking.paymentStatus === "PAID") {
+  if (booking.paymentStatus === "PAID" && booking.status !== "PENDING") {
     return { ok: true as const };
   }
 
@@ -208,10 +222,39 @@ export async function simulatePixPayment(bookingId: string) {
       }),
     });
   } catch (error) {
-    console.error("[simulate-pix] whatsapp", error);
+    console.error("[confirm-booking] whatsapp", error);
   }
 
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/check-in");
   return { ok: true as const };
+}
+
+export async function markBookingPaid(bookingId: string) {
+  const { tenantId } = await requireStaffSession();
+  await assertOwnedBooking(tenantId, bookingId);
+  return confirmPaidBooking(bookingId);
+}
+
+export async function getPendingBookings() {
+  const { tenantId } = await requireStaffSession();
+  const bookings = await prisma.booking.findMany({
+    where: { tenantId, status: "PENDING" },
+    include: { pet: { include: { tutor: true } } },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return bookings.map((booking) => ({
+    id: booking.id,
+    petName: booking.pet.name,
+    tutorName: booking.pet.tutor.name,
+    tutorPhone: booking.pet.tutor.phone,
+    serviceType: booking.serviceType,
+    startDate: booking.startDate,
+    endDate: booking.endDate,
+    depositAmount: serializeMoney(booking.depositAmount),
+    paymentStatus: booking.paymentStatus,
+  }));
 }
 
 export async function getBookingPaymentStatus(bookingId: string) {

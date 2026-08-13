@@ -9,6 +9,8 @@ import {
   MessageCircle,
   PawPrint,
   ClipboardCheck,
+  Settings,
+  Inbox,
 } from "lucide-react";
 import { logoutAction } from "@/actions/auth";
 import { APP_NAME } from "@/lib/constants";
@@ -20,14 +22,20 @@ const NAV = [
   { href: "/dashboard/daily-logs", label: "Diário de bordo", icon: Camera },
   { href: "/dashboard/check-in", label: "Check-in e vacinas", icon: ClipboardCheck },
   { href: "/dashboard/whatsapp", label: "WhatsApp", icon: MessageCircle },
+  { href: "/dashboard/configuracoes", label: "Configurações", icon: Settings },
 ];
 
 export function DashboardSidebar({
   tenantName,
+  showLeads = false,
 }: {
   tenantName: string;
+  showLeads?: boolean;
 }) {
   const pathname = usePathname();
+  const items = showLeads
+    ? [...NAV, { href: "/dashboard/leads", label: "Pedidos de acesso", icon: Inbox }]
+    : NAV;
 
   return (
     <aside className="flex h-full w-64 flex-col border-r bg-card">
@@ -41,7 +49,7 @@ export function DashboardSidebar({
         </div>
       </div>
       <nav className="flex-1 space-y-1 p-3">
-        {NAV.map((item) => {
+        {items.map((item) => {
           const active =
             item.href === "/dashboard"
               ? pathname === item.href

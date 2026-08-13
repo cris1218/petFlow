@@ -37,7 +37,7 @@ export default function LoginPage() {
             Entrar no PetFlow
           </CardTitle>
           <CardDescription>
-            Painel do estabelecimento. Demo: maria.s@example.com / demo1234
+            Painel do estabelecimento. Use o e-mail e a senha do hotel.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -48,7 +48,7 @@ export default function LoginPage() {
                 id="email"
                 name="email"
                 type="email"
-                defaultValue="maria.s@example.com"
+                autoComplete="email"
                 required
               />
             </div>
@@ -58,7 +58,7 @@ export default function LoginPage() {
                 id="password"
                 name="password"
                 type="password"
-                defaultValue="demo1234"
+                autoComplete="current-password"
                 required
               />
             </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { QrCode } from "lucide-react";
 import {
   markWhatsAppConnected,
@@ -31,13 +32,19 @@ export function WhatsAppQrCard({
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
 
-  async function requestQr(refresh: boolean): Promise<"qr" | "wait" | "error"> {
+  async function requestQr(refresh: boolean): Promise<"qr" | "wait" | "error" | "connected"> {
     const result = refresh ? await refreshWhatsAppQr() : await pairWhatsApp();
     if (!result.ok) {
       setError(result.error ?? "Não foi possível gerar o QR Code.");
       setStatus(null);
       return "error";
+    }
+    if ("connected" in result && result.connected) {
+      setStatus("WhatsApp conectado.");
+      setQr(null);
+      return "connected";
     }
     setMocked(result.mocked);
     if (result.qrBase64) {
@@ -53,11 +60,19 @@ export function WhatsAppQrCard({
     startTransition(async () => {
       setError(null);
       const first = await requestQr(refresh);
+      if (first === "connected") {
+        router.refresh();
+        return;
+      }
       if (first !== "wait") return;
 
       for (let attempt = 0; attempt < 8; attempt += 1) {
         await new Promise((resolve) => setTimeout(resolve, 2000));
         const next = await requestQr(true);
+        if (next === "connected") {
+          router.refresh();
+          return;
+        }
         if (next !== "wait") return;
       }
 

@@ -42,7 +42,7 @@ services:
       - evolution_redis:/data
 
   evolution:
-    image: evoapicloud/evolution-api:v2.2.3
+    image: evoapicloud/evolution-api:v2.3.6
     container_name: petflow-evolution
     restart: unless-stopped
     ports:

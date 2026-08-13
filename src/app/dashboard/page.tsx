@@ -1,8 +1,12 @@
-import { getTodayOccupation } from "@/actions/bookings";
+import { getPendingBookings, getTodayOccupation } from "@/actions/bookings";
 import { OccupationGrid } from "@/components/dashboard/occupation-grid";
+import { PendingBookings } from "@/components/dashboard/pending-bookings";
 
 export default async function DashboardPage() {
-  const occupation = await getTodayOccupation();
+  const [occupation, pending] = await Promise.all([
+    getTodayOccupation(),
+    getPendingBookings(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -12,6 +16,7 @@ export default async function DashboardPage() {
           Ocupação do dia, check-ins e check-outs.
         </p>
       </div>
+      <PendingBookings bookings={pending} />
       <OccupationGrid
         checkIns={occupation.checkIns}
         checkOuts={occupation.checkOuts}

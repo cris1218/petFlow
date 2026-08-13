@@ -5,17 +5,33 @@ import { requireStaffSession } from "@/lib/auth";
 import { slugify } from "@/lib/utils";
 import {
   ensureWhatsAppInstance,
+  getWhatsAppConnectionState,
   getWhatsAppQr,
 } from "@/lib/whatsapp";
 
+async function syncConnected(tenantId: string, instanceName: string) {
+  const state = await getWhatsAppConnectionState(instanceName);
+  const connected = state === "open";
+  await prisma.tenant.update({
+    where: { id: tenantId },
+    data: { whatsappConnected: connected },
+  });
+  return connected;
+}
+
 export async function getWhatsAppConnection() {
-  const { user } = await requireStaffSession();
+  const { user, tenantId } = await requireStaffSession();
   const instanceName =
     user.tenant.whatsappInstanceName ?? `petflow_${slugify(user.tenant.slug)}`;
 
+  let connected = user.tenant.whatsappConnected;
+  if (user.tenant.whatsappInstanceName) {
+    connected = await syncConnected(tenantId, instanceName);
+  }
+
   return {
     instanceName,
-    connected: user.tenant.whatsappConnected,
+    connected,
     number: user.tenant.whatsappNumber,
   };
 }
@@ -32,14 +48,16 @@ export async function pairWhatsApp() {
     });
 
     const qr = await ensureWhatsAppInstance(instanceName);
+    const connected = await syncConnected(tenantId, instanceName);
 
     return {
       ok: true as const,
       instanceName,
       mocked: qr.mocked,
-      qrBase64: qr.qrBase64,
+      qrBase64: connected ? null : qr.qrBase64,
       pairingCode: qr.pairingCode,
       missing: qr.missing,
+      connected,
     };
   } catch (error) {
     console.error("[pairWhatsApp]", error);
@@ -55,11 +73,24 @@ export async function pairWhatsApp() {
 
 export async function refreshWhatsAppQr() {
   try {
-    const { user } = await requireStaffSession();
+    const { user, tenantId } = await requireStaffSession();
     const instanceName = user.tenant.whatsappInstanceName;
 
     if (!instanceName) {
       return pairWhatsApp();
+    }
+
+    const connected = await syncConnected(tenantId, instanceName);
+    if (connected) {
+      return {
+        ok: true as const,
+        instanceName,
+        mocked: false,
+        qrBase64: null,
+        pairingCode: null,
+        missing: false,
+        connected: true,
+      };
     }
 
     const qr = await getWhatsAppQr(instanceName);
@@ -73,6 +104,7 @@ export async function refreshWhatsAppQr() {
       qrBase64: qr.qrBase64,
       pairingCode: qr.pairingCode,
       missing: false,
+      connected: false,
     };
   } catch (error) {
     console.error("[refreshWhatsAppQr]", error);

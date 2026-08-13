@@ -72,6 +72,11 @@ model Tenant {
   whatsappNumber       String?
   whatsappInstanceName String?      @unique
   whatsappConnected    Boolean      @default(false)
+  mpAccessTokenEnc     String?
+  hotelRate            Decimal      @default(80) @db.Decimal(10, 2)
+  daycareRate          Decimal      @default(50) @db.Decimal(10, 2)
+  groomingRate         Decimal      @default(70) @db.Decimal(10, 2)
+  depositRate          Decimal      @default(0.30) @db.Decimal(4, 2)
   status               TenantStatus @default(TRIAL)
   createdAt            DateTime     @default(now())
   updatedAt            DateTime     @updatedAt
@@ -85,6 +90,18 @@ model Tenant {
   checklistItems ChecklistItem[]
 
   @@index([status])
+}
+
+model Lead {
+  id        String   @id @default(cuid())
+  hotelName String
+  city      String
+  phone     String
+  email     String
+  notes     String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
 }
 
 model User {

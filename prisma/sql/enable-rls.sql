@@ -4,6 +4,7 @@
 -- O Prisma continua com acesso total (owner do banco, bypass de RLS).
 
 ALTER TABLE "Tenant" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Lead" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "User" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "Tutor" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "Pet" ENABLE ROW LEVEL SECURITY;
@@ -12,8 +13,8 @@ ALTER TABLE "Booking" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "DailyLog" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "ChecklistItem" ENABLE ROW LEVEL SECURITY;
 
-REVOKE ALL ON TABLE "Tenant", "User", "Tutor", "Pet", "Vaccine", "Booking", "DailyLog", "ChecklistItem"
+REVOKE ALL ON TABLE "Tenant", "User", "Tutor", "Pet", "Vaccine", "Booking", "DailyLog", "ChecklistItem", "Lead"
   FROM anon, authenticated;
 
-GRANT ALL ON TABLE "Tenant", "User", "Tutor", "Pet", "Vaccine", "Booking", "DailyLog", "ChecklistItem"
+GRANT ALL ON TABLE "Tenant", "User", "Tutor", "Pet", "Vaccine", "Booking", "DailyLog", "ChecklistItem", "Lead"
   TO postgres, service_role;

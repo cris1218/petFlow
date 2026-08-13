@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CalendarDays, Camera, MessageCircle, PawPrint, ShieldCheck } from "lucide-react";
 import { APP_NAME, APP_SLOGAN } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
+import { AccessRequestForm } from "@/components/access-request-form";
 
 export default function HomePage() {
   return (
@@ -20,21 +21,21 @@ export default function HomePage() {
 
       <main className="mx-auto max-w-6xl px-6 pb-20 pt-10">
         <p className="mb-3 text-sm font-medium uppercase tracking-widest text-primary">
-          SaaS para hotéis e creches pet
+          Sistema para hotéis e creches pet
         </p>
         <h1 className="max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl">
           {APP_SLOGAN}
         </h1>
         <p className="mt-4 max-w-2xl text-lg text-muted-foreground">
-          PetFlow organiza ocupação, vacinas, pertences e o diário de bordo do
-          pet — e avisa o tutor no WhatsApp, no plano gratuito da Vercel, Neon e Cloudinary.
+          Agenda, vacinas, pertences e diário de bordo — com confirmação no
+          WhatsApp e sinal via PIX da conta do próprio hotel.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Button asChild size="lg">
-            <Link href="/agendar/hotel-do-ron-ron">Ver portal de agendamento</Link>
+            <a href="#pedir-acesso">Pedir acesso</a>
           </Button>
           <Button asChild variant="outline" size="lg">
-            <Link href="/login">Acessar dashboard</Link>
+            <Link href="/agendar/hotel-do-ron-ron">Ver portal de exemplo</Link>
           </Button>
         </div>
 
@@ -47,7 +48,7 @@ export default function HomePage() {
           <Feature
             icon={Camera}
             title="Diário de bordo"
-            text="Foto no Cloudinary e status rápido disparado no WhatsApp."
+            text="Foto e status rápido disparados no WhatsApp do tutor."
           />
           <Feature
             icon={ShieldCheck}
@@ -57,9 +58,18 @@ export default function HomePage() {
           <Feature
             icon={MessageCircle}
             title="PIX + WhatsApp"
-            text="Sinal via Mercado Pago e confirmação automática na Evolution API."
+            text="O hotel conecta o próprio Mercado Pago. Confirmação automática no WhatsApp."
           />
         </div>
+
+        <section className="mt-20 max-w-2xl">
+          <h2 className="text-2xl font-semibold">Quer o PetFlow no seu hotel?</h2>
+          <p className="mt-2 mb-6 text-muted-foreground">
+            Estamos liberando um estabelecimento de cada vez. Deixe seus dados e
+            falamos com você.
+          </p>
+          <AccessRequestForm />
+        </section>
       </main>
     </div>
   );

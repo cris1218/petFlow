@@ -169,6 +169,10 @@ async function getConnectionState(instanceName: string) {
   return result.data?.instance?.state ?? result.data?.instance?.status ?? null;
 }
 
+export async function getWhatsAppConnectionState(instanceName: string) {
+  return getConnectionState(instanceName);
+}
+
 async function logoutInstance(instanceName: string) {
   const deleted = await evolutionRequest(`/instance/logout/${instanceName}`, {
     method: "DELETE",

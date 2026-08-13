@@ -5,7 +5,6 @@ import { Check, PawPrint } from "lucide-react";
 import {
   createBooking,
   getBookingPaymentStatus,
-  simulatePixPayment,
 } from "@/actions/bookings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,28 +18,34 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  SERVICE_DAILY_RATE,
   SERVICE_LABELS,
   SIZE_LABELS,
   SPECIES_LABELS,
 } from "@/lib/constants";
-import { calculateStayPricing } from "@/lib/pricing";
+import { calculateStayPricing, dailyRateFor, TenantRates } from "@/lib/pricing";
 import { formatBRL, formatDate, vaccineStatusFromExpiration } from "@/lib/utils";
 import { ServiceType } from "@prisma/client";
 
 const STEPS = [
   "Serviço e período",
   "Tutor e pet",
-  "Pagamento PIX",
+  "Pagamento",
   "Confirmação",
 ];
 
 type WizardProps = {
   tenantName: string;
   tenantSlug: string;
+  rates: TenantRates;
+  pixEnabled: boolean;
 };
 
-export function BookingWizard({ tenantName, tenantSlug }: WizardProps) {
+export function BookingWizard({
+  tenantName,
+  tenantSlug,
+  rates,
+  pixEnabled,
+}: WizardProps) {
   const [step, setStep] = useState(1);
   const [serviceType, setServiceType] = useState<ServiceType>("HOTEL");
   const [startDate, setStartDate] = useState("");
@@ -67,7 +72,6 @@ export function BookingWizard({ tenantName, tenantSlug }: WizardProps) {
   const [pix, setPix] = useState<{
     qrCode: string;
     qrCodeBase64: string;
-    mocked: boolean;
   } | null>(null);
   const [expiredVaccines, setExpiredVaccines] = useState<string[]>([]);
   const [confirmed, setConfirmed] = useState(false);
@@ -81,8 +85,8 @@ export function BookingWizard({ tenantName, tenantSlug }: WizardProps) {
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
       return null;
     }
-    return calculateStayPricing(serviceType, start, end);
-  }, [serviceType, startDate, endDate]);
+    return calculateStayPricing(serviceType, start, end, rates);
+  }, [serviceType, startDate, endDate, rates]);
 
   const vaccineAlerts = useMemo(
     () =>
@@ -196,7 +200,7 @@ export function BookingWizard({ tenantName, tenantSlug }: WizardProps) {
                 >
                   <p className="font-semibold">{SERVICE_LABELS[type]}</p>
                   <p className="text-sm text-muted-foreground">
-                    {formatBRL(SERVICE_DAILY_RATE[type])} / diária
+                    {formatBRL(dailyRateFor(type, rates))} / diária
                   </p>
                 </button>
               ))}
@@ -356,62 +360,58 @@ export function BookingWizard({ tenantName, tenantSlug }: WizardProps) {
                 Voltar
               </Button>
               <Button onClick={submitBooking} disabled={isPending}>
-                {isPending ? "Gerando PIX..." : "Gerar PIX do sinal"}
+                {isPending
+                  ? "Enviando..."
+                  : pixEnabled
+                    ? "Gerar PIX do sinal"
+                    : "Enviar reserva"}
               </Button>
             </div>
           </div>
         )}
 
-        {step === 3 && pix && pricing && (
+        {step === 3 && pricing && (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Pague o sinal de {formatBRL(pricing.depositAmount)} via PIX. A reserva
-              confirma automaticamente após o pagamento.
-            </p>
-            {pix.qrCodeBase64 ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={
-                  pix.qrCodeBase64.startsWith("data:")
-                    ? pix.qrCodeBase64
-                    : `data:image/png;base64,${pix.qrCodeBase64}`
-                }
-                alt="QR Code PIX"
-                className="mx-auto h-56 w-56 rounded-xl border bg-white p-3"
-              />
-            ) : (
-              <div className="rounded-xl border bg-muted p-4 text-center text-sm">
-                {pix.mocked
-                  ? "Modo demonstração: configure MP_ACCESS_TOKEN para PIX real. No sandbox, o webhook confirma a reserva."
-                  : "QR Code indisponível. Use o código copia e cola."}
-              </div>
-            )}
-            <div className="rounded-md border bg-muted p-3 font-mono text-xs break-all">
-              {pix.qrCode}
-            </div>
-            {expiredVaccines.length > 0 && (
-              <Badge variant="warning">Vacinas vencidas: {expiredVaccines.join(", ")}</Badge>
-            )}
-            <p className="text-sm text-muted-foreground">
-              Aguardando confirmação do Mercado Pago...
-            </p>
-            {pix.mocked && (
-              <Button
-                variant="outline"
-                onClick={() => {
-                  if (!bookingId) return;
-                  startTransition(async () => {
-                    const result = await simulatePixPayment(bookingId);
-                    if (result.ok) {
-                      setConfirmed(true);
-                      setStep(4);
+            {pix ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Pague o sinal de {formatBRL(pricing.depositAmount)} via PIX. A
+                  reserva confirma automaticamente após o pagamento.
+                </p>
+                {pix.qrCodeBase64 ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={
+                      pix.qrCodeBase64.startsWith("data:")
+                        ? pix.qrCodeBase64
+                        : `data:image/png;base64,${pix.qrCodeBase64}`
                     }
-                  });
-                }}
-                disabled={isPending}
-              >
-                Simular pagamento (demo)
-              </Button>
+                    alt="QR Code PIX"
+                    className="mx-auto h-56 w-56 rounded-xl border bg-white p-3"
+                  />
+                ) : (
+                  <div className="rounded-xl border bg-muted p-4 text-center text-sm">
+                    QR Code indisponível. Use o código copia e cola.
+                  </div>
+                )}
+                <div className="rounded-md border bg-muted p-3 font-mono text-xs break-all">
+                  {pix.qrCode}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Aguardando confirmação do Mercado Pago...
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Reserva enviada. Pague o sinal de{" "}
+                {formatBRL(pricing.depositAmount)} no hotel. Assim que o
+                estabelecimento confirmar, esta página atualiza sozinha.
+              </p>
+            )}
+            {expiredVaccines.length > 0 && (
+              <Badge variant="warning">
+                Vacinas vencidas: {expiredVaccines.join(", ")}
+              </Badge>
             )}
           </div>
         )}

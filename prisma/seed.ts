@@ -29,7 +29,7 @@ async function main() {
 
   await prisma.user.upsert({
     where: { email: "maria.s@example.com" },
-    update: { passwordHash },
+    update: { tenantId: tenant.id, name: "Ana Costa", role: "ADMIN" },
     create: {
       tenantId: tenant.id,
       name: "Ana Costa",

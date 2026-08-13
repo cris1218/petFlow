@@ -1,42 +1,45 @@
 import { MercadoPagoConfig, Payment } from "mercadopago";
 import { getAppUrl } from "@/lib/app-url";
+import { decryptSecret } from "@/lib/secrets";
 
 export type PixCharge = {
   paymentId: string;
   qrCode: string;
   qrCodeBase64: string;
   ticketUrl?: string;
-  mocked: boolean;
 };
 
-function mpClient() {
-  const token = process.env.MP_ACCESS_TOKEN;
-  if (!token) return null;
-  return new MercadoPagoConfig({ accessToken: token });
+type TenantMpSource = {
+  mpAccessTokenEnc?: string | null;
+};
+
+export function resolveMercadoPagoToken(tenant?: TenantMpSource | null) {
+  if (tenant?.mpAccessTokenEnc) {
+    try {
+      return decryptSecret(tenant.mpAccessTokenEnc);
+    } catch (error) {
+      console.error("[mercadopago] token decrypt failed", error);
+    }
+  }
+  return process.env.MP_ACCESS_TOKEN || null;
 }
 
-export function isMercadoPagoConfigured() {
-  return Boolean(process.env.MP_ACCESS_TOKEN);
+export function isMercadoPagoConfigured(tenant?: TenantMpSource | null) {
+  return Boolean(resolveMercadoPagoToken(tenant));
+}
+
+function mpClient(accessToken: string) {
+  return new MercadoPagoConfig({ accessToken });
 }
 
 export async function createPixDeposit(input: {
+  accessToken: string;
   bookingId: string;
   amount: number;
   description: string;
   payerEmail: string;
 }): Promise<PixCharge> {
-  const client = mpClient();
-
-  if (!client) {
-    return {
-      paymentId: `mock_${input.bookingId}`,
-      qrCode: `00020126580014BR.GOV.BCB.PIX0136petflow-mock-${input.bookingId}`,
-      qrCodeBase64: "",
-      mocked: true,
-    };
-  }
-
-  const payment = new Payment(client);
+  const payment = new Payment(mpClient(input.accessToken));
   const notificationUrl = `${getAppUrl()}/api/webhooks/mercadopago`;
 
   const result = await payment.create({
@@ -59,21 +62,11 @@ export async function createPixDeposit(input: {
     qrCode: tx?.qr_code ?? "",
     qrCodeBase64: tx?.qr_code_base64 ?? "",
     ticketUrl: tx?.ticket_url,
-    mocked: false,
   };
 }
 
-export async function getMercadoPagoPayment(paymentId: string) {
-  const client = mpClient();
-  if (!client) {
-    return {
-      id: paymentId,
-      status: paymentId.startsWith("mock_") ? "approved" : "pending",
-      externalReference: paymentId.replace("mock_", ""),
-    };
-  }
-
-  const payment = new Payment(client);
+export async function getMercadoPagoPayment(paymentId: string, accessToken: string) {
+  const payment = new Payment(mpClient(accessToken));
   const result = await payment.get({ id: paymentId });
 
   return {
