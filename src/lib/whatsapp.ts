@@ -50,16 +50,28 @@ type EvolutionPayload = {
   base64?: string;
   code?: string;
   pairingCode?: string;
-  qrcode?: { base64?: string; code?: string };
-  instance?: { status?: string };
+  count?: number;
+  qrcode?: { base64?: string; code?: string; pairingCode?: string };
+  instance?: { status?: string; state?: string; instanceName?: string };
 };
 
 function extractQr(data: EvolutionPayload | null) {
   const qrBase64 = data?.base64 ?? data?.qrcode?.base64 ?? null;
+  const pairingCode =
+    data?.pairingCode ??
+    data?.qrcode?.pairingCode ??
+    (data?.code && !String(data.code).startsWith("2@") ? data.code : null) ??
+    data?.qrcode?.code ??
+    null;
+
   return {
-    qrBase64,
-    pairingCode: data?.pairingCode ?? data?.code ?? data?.qrcode?.code ?? null,
+    qrBase64: qrBase64 || null,
+    pairingCode: pairingCode || null,
   };
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function evolutionFetch(path: string, init?: RequestInit) {
@@ -96,36 +108,46 @@ async function evolutionFetch(path: string, init?: RequestInit) {
 }
 
 export async function getWhatsAppQr(instanceName: string) {
+  const result = await evolutionFetch(`/instance/connect/${instanceName}`);
+  return { mocked: result.mocked, ...extractQr(result.data) };
+}
+
+async function deleteInstance(instanceName: string) {
   try {
-    const result = await evolutionFetch(`/instance/connect/${instanceName}`);
-    const qr = extractQr(result.data);
-    return { mocked: result.mocked, ...qr };
+    await evolutionFetch(`/instance/delete/${instanceName}`, { method: "DELETE" });
   } catch {
-    const result = await evolutionFetch(`/instance/qrcode/${instanceName}`);
-    const qr = extractQr(result.data);
-    return { mocked: result.mocked, ...qr };
+    // instância pode não existir
   }
 }
 
-export async function ensureWhatsAppInstance(instanceName: string, number?: string) {
-  try {
-    await evolutionFetch("/instance/create", {
-      method: "POST",
-      body: JSON.stringify({
-        instanceName,
-        qrcode: true,
-        integration: "WHATSAPP-BAILEYS",
-        number,
-      }),
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "";
-    if (!/already|exist|409|403/i.test(message)) {
-      throw error;
-    }
+export async function ensureWhatsAppInstance(instanceName: string) {
+  await deleteInstance(instanceName);
+
+  const created = await evolutionFetch("/instance/create", {
+    method: "POST",
+    body: JSON.stringify({
+      instanceName,
+      qrcode: true,
+      integration: "WHATSAPP-BAILEYS",
+    }),
+  });
+
+  const fromCreate = extractQr(created.data);
+  if (fromCreate.qrBase64) {
+    return { mocked: false, ...fromCreate };
   }
 
-  return getWhatsAppQr(instanceName);
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await sleep(800);
+    const qr = await getWhatsAppQr(instanceName);
+    if (qr.qrBase64) return qr;
+  }
+
+  return {
+    mocked: false,
+    qrBase64: null,
+    pairingCode: null,
+  };
 }
 
 export async function sendWhatsAppText(input: {

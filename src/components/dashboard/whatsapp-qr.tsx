@@ -29,18 +29,38 @@ export function WhatsAppQrCard({
   const [qr, setQr] = useState<string | null>(null);
   const [mocked, setMocked] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  async function requestQr(refresh: boolean) {
+    const result = refresh ? await refreshWhatsAppQr() : await pairWhatsApp();
+    if (!result.ok) {
+      setError(result.error ?? "Não foi possível gerar o QR Code.");
+      return false;
+    }
+    setMocked(result.mocked);
+    if (result.qrBase64) {
+      setQr(result.qrBase64);
+      setStatus(null);
+      return true;
+    }
+    setStatus("A Evolution está gerando o QR. Tentando de novo…");
+    return false;
+  }
 
   function loadQr(refresh = false) {
     startTransition(async () => {
       setError(null);
-      const result = refresh ? await refreshWhatsAppQr() : await pairWhatsApp();
-      if (!result.ok) {
-        setError(result.error ?? "Não foi possível gerar o QR Code.");
-        return;
+      const gotQr = await requestQr(refresh);
+      if (gotQr) return;
+
+      for (let attempt = 0; attempt < 8; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        const got = await requestQr(true);
+        if (got) return;
       }
-      setQr(result.qrBase64);
-      setMocked(result.mocked);
+
+      setError("QR ainda não chegou. Confira SERVER_URL no Railway e clique em Atualizar.");
     });
   }
 
@@ -73,9 +93,10 @@ export function WhatsAppQrCard({
             />
           ) : (
             <p className="text-center text-sm text-muted-foreground">
-              {mocked
-                ? "Evolution API não configurada. Suba com yarn whatsapp:up e reinicie o yarn dev."
-                : "Gere o QR Code para parear o número do estabelecimento."}
+              {status ??
+                (mocked
+                  ? "Evolution API não configurada."
+                  : "Gere o QR Code para parear o número do estabelecimento.")}
             </p>
           )}
         </div>
