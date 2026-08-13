@@ -74,7 +74,7 @@ export function WhatsAppQrCard({
           ) : (
             <p className="text-center text-sm text-muted-foreground">
               {mocked
-                ? "Evolution API não configurada. O envio será simulado no servidor."
+                ? "Evolution API não configurada. Suba com yarn whatsapp:up e reinicie o yarn dev."
                 : "Gere o QR Code para parear o número do estabelecimento."}
             </p>
           )}

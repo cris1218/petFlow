@@ -31,7 +31,7 @@ export default function HomePage() {
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Button asChild size="lg">
-            <Link href="/agendar/hotel-patinhas">Ver portal de agendamento</Link>
+            <Link href="/agendar/hotel-do-ron-ron">Ver portal de agendamento</Link>
           </Button>
           <Button asChild variant="outline" size="lg">
             <Link href="/login">Acessar dashboard</Link>

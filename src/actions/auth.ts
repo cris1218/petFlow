@@ -28,7 +28,7 @@ export async function loginAction(formData: FormData) {
     return {
       ok: false as const,
       error:
-        "Não foi possível conectar ao banco. Confira DATABASE_URL no .env e rode yarn db:up && yarn db:push && yarn db:seed.",
+        "Não foi possível conectar ao banco. Reinicie o yarn dev para carregar o .env do Supabase.",
     };
   }
 

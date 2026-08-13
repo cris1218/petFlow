@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "postinstall": "prisma generate",
-    "db:up": "docker compose up -d postgres",
+    "whatsapp:up": "docker compose up -d evolution",
     "db:down": "docker compose down",
     "db:generate": "prisma generate",
     "db:push": "prisma db push && yarn db:secure",

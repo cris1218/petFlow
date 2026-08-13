@@ -1,4 +1,5 @@
 import { formatDate, toWhatsAppNumber } from "@/lib/utils";
+import { readEnv } from "@/lib/env";
 
 type ConfirmationInput = {
   tutorName: string;
@@ -29,31 +30,55 @@ export const whatsappTemplates = {
   },
 };
 
+function evolutionUrl() {
+  return readEnv("EVOLUTION_API_URL")?.replace(/\/$/, "") ?? "";
+}
+
+function evolutionKey() {
+  return readEnv("EVOLUTION_API_KEY") ?? "";
+}
+
 function evolutionConfigured() {
-  return Boolean(process.env.EVOLUTION_API_URL && process.env.EVOLUTION_API_KEY);
+  return Boolean(evolutionUrl() && evolutionKey());
 }
 
 export function isWhatsAppConfigured() {
   return evolutionConfigured();
 }
 
+type EvolutionPayload = {
+  base64?: string;
+  code?: string;
+  pairingCode?: string;
+  qrcode?: { base64?: string; code?: string };
+  instance?: { status?: string };
+};
+
+function extractQr(data: EvolutionPayload | null) {
+  const qrBase64 = data?.base64 ?? data?.qrcode?.base64 ?? null;
+  return {
+    qrBase64,
+    pairingCode: data?.pairingCode ?? data?.code ?? data?.qrcode?.code ?? null,
+  };
+}
+
 async function evolutionFetch(path: string, init?: RequestInit) {
   if (!evolutionConfigured()) {
     console.info("[whatsapp:mock]", path, init?.body);
-    return { ok: true, mocked: true, data: null as unknown };
+    return { ok: true, mocked: true, data: null as EvolutionPayload | null };
   }
 
-  const base = process.env.EVOLUTION_API_URL!.replace(/\/$/, "");
-  const response = await fetch(`${base}${path}`, {
+  const response = await fetch(`${evolutionUrl()}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      apikey: process.env.EVOLUTION_API_KEY!,
+      apikey: evolutionKey(),
       ...init?.headers,
     },
+    cache: "no-store",
   });
 
-  const data = await response.json().catch(() => null);
+  const data = (await response.json().catch(() => null)) as EvolutionPayload | null;
 
   if (!response.ok) {
     throw new Error(
@@ -64,23 +89,16 @@ async function evolutionFetch(path: string, init?: RequestInit) {
   return { ok: true, mocked: false, data };
 }
 
-export async function connectWhatsAppInstance(instanceName: string) {
-  return evolutionFetch(`/instance/connect/${instanceName}`);
-}
-
 export async function getWhatsAppQr(instanceName: string) {
-  const result = await evolutionFetch(`/instance/connect/${instanceName}`);
-  const data = result.data as {
-    base64?: string;
-    code?: string;
-    qrcode?: { base64?: string };
-  } | null;
-
-  return {
-    mocked: result.mocked,
-    qrBase64: data?.base64 ?? data?.qrcode?.base64 ?? null,
-    pairingCode: data?.code ?? null,
-  };
+  try {
+    const result = await evolutionFetch(`/instance/connect/${instanceName}`);
+    const qr = extractQr(result.data);
+    return { mocked: result.mocked, ...qr };
+  } catch {
+    const result = await evolutionFetch(`/instance/qrcode/${instanceName}`);
+    const qr = extractQr(result.data);
+    return { mocked: result.mocked, ...qr };
+  }
 }
 
 export async function ensureWhatsAppInstance(instanceName: string, number?: string) {
@@ -96,7 +114,7 @@ export async function ensureWhatsAppInstance(instanceName: string, number?: stri
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
-    if (!message.includes("already") && !message.includes("409")) {
+    if (!/already|exist|409|403/i.test(message)) {
       throw error;
     }
   }

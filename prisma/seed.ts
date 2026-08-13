@@ -6,17 +6,26 @@ const prisma = new PrismaClient();
 async function main() {
   const passwordHash = await bcrypt.hash("demo1234", 10);
 
-  const tenant = await prisma.tenant.upsert({
-    where: { slug: "hotel-patinhas" },
-    update: {},
-    create: {
-      name: "Hotel Patinhas",
-      slug: "hotel-patinhas",
-      whatsappNumber: "11988887777",
-      whatsappInstanceName: "petflow_hotel-patinhas",
-      status: "ACTIVE",
+  const tenantData = {
+    name: "Hotel do Ron Ron",
+    slug: "hotel-do-ron-ron",
+    whatsappNumber: "11988887777",
+    whatsappInstanceName: "petflow_hotel-do-ron-ron",
+    status: "ACTIVE" as const,
+  };
+
+  const existingTenant = await prisma.tenant.findFirst({
+    where: {
+      OR: [{ slug: "hotel-do-ron-ron" }, { slug: "hotel-patinhas" }],
     },
   });
+
+  const tenant = existingTenant
+    ? await prisma.tenant.update({
+        where: { id: existingTenant.id },
+        data: tenantData,
+      })
+    : await prisma.tenant.create({ data: tenantData });
 
   await prisma.user.upsert({
     where: { email: "maria.s@example.com" },
@@ -110,8 +119,8 @@ async function main() {
     });
   }
 
-  console.log("Seed ok: Hotel Patinhas · maria.s@example.com / demo1234");
-  console.log("Portal público: /agendar/hotel-patinhas");
+  console.log("Seed ok: Hotel do Ron Ron · maria.s@example.com / demo1234");
+  console.log("Portal público: /agendar/hotel-do-ron-ron");
 }
 
 main()
