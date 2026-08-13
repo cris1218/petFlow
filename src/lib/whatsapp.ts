@@ -68,15 +68,21 @@ async function evolutionFetch(path: string, init?: RequestInit) {
     return { ok: true, mocked: true, data: null as EvolutionPayload | null };
   }
 
-  const response = await fetch(`${evolutionUrl()}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      apikey: evolutionKey(),
-      ...init?.headers,
-    },
-    cache: "no-store",
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${evolutionUrl()}${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        apikey: evolutionKey(),
+        ...init?.headers,
+      },
+      cache: "no-store",
+    });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "falha de rede";
+    throw new Error(`Não foi possível alcançar a Evolution API (${evolutionUrl()}): ${detail}`);
+  }
 
   const data = (await response.json().catch(() => null)) as EvolutionPayload | null;
 

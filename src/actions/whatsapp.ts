@@ -21,45 +21,64 @@ export async function getWhatsAppConnection() {
 }
 
 export async function pairWhatsApp() {
-  const { user, tenantId } = await requireStaffSession();
-  const instanceName =
-    user.tenant.whatsappInstanceName ?? `petflow_${slugify(user.tenant.slug)}`;
+  try {
+    const { user, tenantId } = await requireStaffSession();
+    const instanceName =
+      user.tenant.whatsappInstanceName ?? `petflow_${slugify(user.tenant.slug)}`;
 
-  await prisma.tenant.update({
-    where: { id: tenantId },
-    data: { whatsappInstanceName: instanceName },
-  });
+    await prisma.tenant.update({
+      where: { id: tenantId },
+      data: { whatsappInstanceName: instanceName },
+    });
 
-  const qr = await ensureWhatsAppInstance(
-    instanceName,
-    user.tenant.whatsappNumber ?? undefined,
-  );
+    const qr = await ensureWhatsAppInstance(instanceName);
 
-  return {
-    ok: true as const,
-    instanceName,
-    mocked: qr.mocked,
-    qrBase64: qr.qrBase64,
-    pairingCode: qr.pairingCode,
-  };
+    return {
+      ok: true as const,
+      instanceName,
+      mocked: qr.mocked,
+      qrBase64: qr.qrBase64,
+      pairingCode: qr.pairingCode,
+    };
+  } catch (error) {
+    console.error("[pairWhatsApp]", error);
+    return {
+      ok: false as const,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Não foi possível gerar o QR Code.",
+    };
+  }
 }
 
 export async function refreshWhatsAppQr() {
-  const { user } = await requireStaffSession();
-  const instanceName = user.tenant.whatsappInstanceName;
+  try {
+    const { user } = await requireStaffSession();
+    const instanceName = user.tenant.whatsappInstanceName;
 
-  if (!instanceName) {
-    return pairWhatsApp();
+    if (!instanceName) {
+      return pairWhatsApp();
+    }
+
+    const qr = await getWhatsAppQr(instanceName);
+    return {
+      ok: true as const,
+      instanceName,
+      mocked: qr.mocked,
+      qrBase64: qr.qrBase64,
+      pairingCode: qr.pairingCode,
+    };
+  } catch (error) {
+    console.error("[refreshWhatsAppQr]", error);
+    return {
+      ok: false as const,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Não foi possível atualizar o QR Code.",
+    };
   }
-
-  const qr = await getWhatsAppQr(instanceName);
-  return {
-    ok: true as const,
-    instanceName,
-    mocked: qr.mocked,
-    qrBase64: qr.qrBase64,
-    pairingCode: qr.pairingCode,
-  };
 }
 
 export async function markWhatsAppConnected(connected: boolean) {

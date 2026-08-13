@@ -1,4 +1,5 @@
 import { MercadoPagoConfig, Payment } from "mercadopago";
+import { getAppUrl } from "@/lib/app-url";
 
 export type PixCharge = {
   paymentId: string;
@@ -36,9 +37,7 @@ export async function createPixDeposit(input: {
   }
 
   const payment = new Payment(client);
-  const notificationUrl = process.env.APP_URL
-    ? `${process.env.APP_URL}/api/webhooks/mercadopago`
-    : undefined;
+  const notificationUrl = `${getAppUrl()}/api/webhooks/mercadopago`;
 
   const result = await payment.create({
     body: {

@@ -36,7 +36,7 @@ export function WhatsAppQrCard({
       setError(null);
       const result = refresh ? await refreshWhatsAppQr() : await pairWhatsApp();
       if (!result.ok) {
-        setError("Não foi possível gerar o QR Code.");
+        setError(result.error ?? "Não foi possível gerar o QR Code.");
         return;
       }
       setQr(result.qrBase64);
