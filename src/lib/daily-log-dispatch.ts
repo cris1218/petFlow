@@ -98,7 +98,7 @@ export async function dispatchDailyLog(logId: string) {
   return { ok: true as const };
 }
 
-export async function processDueDailyLogs(tenantId?: string) {
+export async function processDueDailyLogs(tenantId?: string, take = 5) {
   const due = await prisma.dailyLog.findMany({
     where: {
       sentToWhatsApp: false,
@@ -107,7 +107,7 @@ export async function processDueDailyLogs(tenantId?: string) {
     },
     select: { id: true },
     orderBy: { scheduledAt: "asc" },
-    take: 15,
+    take,
   });
 
   let sent = 0;
