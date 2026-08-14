@@ -14,7 +14,6 @@ import { HotelScheduleForm, type HotelScheduleValues } from "@/components/dashbo
 import { SettingsSection } from "@/components/dashboard/settings-section";
 import { WhatsAppQrCard } from "@/components/dashboard/whatsapp-qr";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";

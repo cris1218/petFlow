@@ -7,7 +7,6 @@ import {
   ensureTenantSchedule,
   getAppointmentSlots,
   getStayAvailability,
-  getTenantScheduleConfig,
 } from "@/lib/tenant-schedule";
 
 export async function getPublicStayAvailability(input: {
