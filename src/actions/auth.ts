@@ -6,6 +6,13 @@ import { prisma } from "@/lib/prisma";
 import { createSession, destroySession, getSession } from "@/lib/auth";
 import { loginSchema, updateAccountSchema } from "@/lib/validations";
 
+function safeFromPath(value: FormDataEntryValue | null) {
+  if (typeof value !== "string") return null;
+  if (!value.startsWith("/dashboard") && !value.startsWith("/admin")) return null;
+  if (value.startsWith("//") || value.includes("://")) return null;
+  return value;
+}
+
 export async function loginAction(formData: FormData) {
   const parsed = loginSchema.safeParse({
     email: formData.get("email"),
@@ -48,7 +55,8 @@ export async function loginAction(formData: FormData) {
       role: user.role,
       email: user.email,
     });
-    redirect("/admin");
+    const from = safeFromPath(formData.get("from"));
+    redirect(from?.startsWith("/admin") ? from : "/admin");
   }
 
   if (!user.tenant) {
@@ -66,7 +74,8 @@ export async function loginAction(formData: FormData) {
     email: user.email,
   });
 
-  redirect("/dashboard");
+  const from = safeFromPath(formData.get("from"));
+  redirect(from?.startsWith("/dashboard") ? from : "/dashboard");
 }
 
 export async function logoutAction() {

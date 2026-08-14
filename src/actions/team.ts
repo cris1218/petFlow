@@ -60,7 +60,6 @@ export async function createHotelStaff(input: {
     select: { id: true, name: true, email: true },
   });
 
-  revalidatePath("/dashboard/equipe");
   revalidatePath("/dashboard/configuracoes");
   return {
     ok: true as const,
@@ -94,7 +93,6 @@ export async function resetStaffPassword(input: {
     data: { passwordHash: await bcrypt.hash(password, 10) },
   });
 
-  revalidatePath("/dashboard/equipe");
   revalidatePath("/dashboard/configuracoes");
   return {
     ok: true as const,
@@ -130,7 +128,6 @@ export async function removeHotelStaff(userId: string) {
     };
   }
 
-  revalidatePath("/dashboard/equipe");
   revalidatePath("/dashboard/configuracoes");
   return { ok: true as const };
 }

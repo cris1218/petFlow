@@ -23,11 +23,18 @@ export default async function PublicBookingPage({
 
   await ensureTenantServices(tenant);
   await ensureTenantSchedule(tenant.id);
-  const services = await prisma.tenantService.findMany({
-    where: { tenantId: tenant.id, active: true },
-    include: { weekdays: true },
-    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-  });
+  const [services, requiredVaccines] = await Promise.all([
+    prisma.tenantService.findMany({
+      where: { tenantId: tenant.id, active: true },
+      include: { weekdays: true },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    }),
+    prisma.tenantRequiredVaccine.findMany({
+      where: { tenantId: tenant.id },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      select: { id: true, name: true },
+    }),
+  ]);
   const pixEnabled = isMercadoPagoConfigured(tenant);
   const serviceNames = services.map((service) => service.name);
   const offerText =
@@ -58,7 +65,7 @@ export default async function PublicBookingPage({
         tenantSlug={tenant.slug}
         tenantLogoUrl={tenant.logoUrl}
         services={services.map(serializeTenantService)}
-        requiredVaccines={[]}
+        requiredVaccines={requiredVaccines}
         pixEnabled={pixEnabled}
         petPolicy={petPolicyFromTenant(tenant)}
       />

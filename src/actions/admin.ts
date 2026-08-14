@@ -10,7 +10,6 @@ import { deleteWhatsAppInstance } from "@/lib/whatsapp";
 import { getBillingState } from "@/lib/billing";
 import { defaultServicesCreate } from "@/lib/services";
 import { defaultBelongingsCreate, defaultVaccinesCreate } from "@/lib/check-in-catalog";
-import { defaultWeekdays } from "@/lib/schedule";
 
 export async function listHotels() {
   await requireMasterSession();
@@ -121,9 +120,6 @@ export async function createHotel(input: {
       },
       requiredVaccines: {
         create: defaultVaccinesCreate(),
-      },
-      weekdays: {
-        create: defaultWeekdays(),
       },
     },
   });

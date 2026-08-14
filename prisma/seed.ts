@@ -1,6 +1,5 @@
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
-import { defaultWeekdays } from "../src/lib/schedule";
 
 const prisma = new PrismaClient() as PrismaClient & {
   tenantService: {
@@ -18,18 +17,6 @@ const prisma = new PrismaClient() as PrismaClient & {
     updateMany: (args: {
       where: { tenantId: string; name: string };
       data: { kind: "STAY" | "DAYCARE" | "APPOINTMENT" };
-    }) => Promise<unknown>;
-  };
-  tenantWeekday: {
-    count: (args: { where: { tenantId: string } }) => Promise<number>;
-    createMany: (args: {
-      data: Array<{
-        tenantId: string;
-        weekday: number;
-        openTime: string;
-        closeTime: string;
-        closed: boolean;
-      }>;
     }) => Promise<unknown>;
   };
 };
@@ -83,15 +70,6 @@ async function main() {
     await prisma.tenantService.updateMany({
       where: { tenantId: tenant.id, name: "Creche" },
       data: { kind: "DAYCARE" },
-    });
-  }
-
-  const weekdayCount = await prisma.tenantWeekday.count({
-    where: { tenantId: tenant.id },
-  });
-  if (weekdayCount === 0) {
-    await prisma.tenantWeekday.createMany({
-      data: defaultWeekdays().map((day) => ({ tenantId: tenant.id, ...day })),
     });
   }
 

@@ -1,12 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Plus, Save, Trash2 } from "lucide-react";
-import {
-  createTenantService,
-  deleteTenantService,
-  updateTenantService,
-} from "@/actions/settings";
+import { Save } from "lucide-react";
+import { updateTenantService } from "@/actions/settings";
 import { WeekdayHoursEditor } from "@/components/dashboard/weekday-hours";
 import { SettingsSection } from "@/components/dashboard/settings-section";
 import { useFeedback } from "@/components/app-feedback";
@@ -14,19 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  SERVICE_KIND_LABELS,
-  defaultWeekdays,
-  type ServiceKind,
-  type WeekdayHours,
-} from "@/lib/schedule";
+import { defaultWeekdays, type ServiceKind, type WeekdayHours } from "@/lib/schedule";
 import { cn, formatBRL } from "@/lib/utils";
 
 export type HotelServiceItem = {
@@ -51,6 +35,34 @@ function priceLabel(kind: ServiceKind) {
   return "Quanto custa a diária";
 }
 
+function EntradaField({
+  service,
+  saveRow,
+}: {
+  service: HotelServiceItem;
+  saveRow: (service: HotelServiceItem, patch: Partial<HotelServiceItem>) => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label>Quanto o tutor paga agora</Label>
+      <Input
+        type="number"
+        min="0"
+        step="0.01"
+        defaultValue={String(service.depositAmount ?? "")}
+        placeholder="Ex.: 50"
+        onBlur={(event) => {
+          const raw = event.target.value.trim();
+          const next = raw === "" ? null : Number(raw);
+          if (next !== service.depositAmount) {
+            saveRow(service, { depositAmount: next });
+          }
+        }}
+      />
+    </div>
+  );
+}
+
 export function HotelServicesForm({
   initial,
 }: {
@@ -58,44 +70,17 @@ export function HotelServicesForm({
 }) {
   const [services, setServices] = useState(initial);
   const [weekdayDrafts, setWeekdayDrafts] = useState<Record<string, WeekdayHours[]>>({});
-  const [name, setName] = useState("");
-  const [price, setPrice] = useState("");
-  const [kind, setKind] = useState<ServiceKind>("STAY");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const { success, error: toastError } = useFeedback();
 
-  function addService() {
-    startTransition(async () => {
-      setError(null);
-      const result = await createTenantService({
-        name,
-        price: Number(price),
-        kind,
-      });
-      if (!result.ok) {
-        setError(result.error);
-        toastError(result.error);
-        return;
-      }
-      setServices((current) => [...current, result.service]);
-      setName("");
-      setPrice("");
-      setKind("STAY");
-      success("Serviço cadastrado.");
-    });
-  }
-
   function saveRow(service: HotelServiceItem, patch: Partial<HotelServiceItem>) {
     startTransition(async () => {
       setError(null);
-      const nextKind = patch.kind ?? service.kind;
       const result = await updateTenantService({
         id: service.id,
-        name: patch.name ?? service.name,
         price: patch.price ?? service.price,
         active: patch.active ?? service.active,
-        kind: nextKind,
         dailyCutoffTime: patch.dailyCutoffTime ?? service.dailyCutoffTime,
         depositAmount:
           patch.depositAmount !== undefined ? patch.depositAmount : service.depositAmount,
@@ -105,7 +90,7 @@ export function HotelServicesForm({
         slotDurationMin: patch.slotDurationMin ?? service.slotDurationMin,
         slotCapacity: patch.slotCapacity ?? service.slotCapacity,
         weekdays:
-          nextKind === "STAY"
+          service.kind === "STAY"
             ? undefined
             : patch.weekdays ?? weekdayDrafts[service.id] ?? service.weekdays,
       });
@@ -123,61 +108,23 @@ export function HotelServicesForm({
           [service.id]: result.service.weekdays,
         }));
       }
-      success("Agenda salva.");
-    });
-  }
-
-  function remove(id: string) {
-    startTransition(async () => {
-      setError(null);
-      const result = await deleteTenantService(id);
-      if (!result.ok) {
-        setError(result.error);
-        toastError(result.error);
-        return;
-      }
-      setServices((current) => current.filter((item) => item.id !== id));
-      success("Serviço removido.");
+      success("Salvo.");
     });
   }
 
   return (
     <div className="space-y-4">
-      {services.length === 0 && (
-        <p className="text-sm text-muted-foreground">
-          Ainda não tem serviço. Cadastre hotel, creche ou banho e tosa abaixo.
-        </p>
-      )}
       {services.map((service) => (
         <SettingsSection
           key={service.id}
           title={service.name}
-          description={
-            service.kind === "STAY"
-              ? "Pernoite. Diga o preço do dia, a entrada, até que horas pode sair e quantos pets cabem."
-              : service.kind === "DAYCARE"
-                ? "O pet passa o dia, sem pernoite. Diga o preço, quantos cabem e os dias de atendimento."
-                : "Hora marcada. Diga o preço, quanto tempo leva e em quais dias atende."
-          }
           extra={
             <Badge variant={service.active ? "success" : "secondary"}>
               {service.active ? "Ativo" : "Pausado"}
             </Badge>
           }
         >
-          <div className="grid gap-3 sm:grid-cols-[1fr_8rem_minmax(11rem,auto)_auto_auto] sm:items-end">
-            <div className="space-y-1.5">
-              <Label>Nome</Label>
-              <Input
-                defaultValue={service.name}
-                onBlur={(event) => {
-                  const next = event.target.value.trim();
-                  if (next && next !== service.name) {
-                    saveRow(service, { name: next });
-                  }
-                }}
-              />
-            </div>
+          <div className="grid gap-3 sm:grid-cols-[minmax(8rem,12rem)_auto] sm:items-end">
             <div className="space-y-1.5">
               <Label>{priceLabel(service.kind)}</Label>
               <Input
@@ -192,29 +139,6 @@ export function HotelServicesForm({
                   }
                 }}
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Tipo</Label>
-              <Select
-                value={service.kind}
-                onValueChange={(value) =>
-                  saveRow(service, {
-                    kind: value as ServiceKind,
-                    weekdays: service.weekdays.length ? service.weekdays : defaultWeekdays(),
-                  })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(SERVICE_KIND_LABELS).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
             <button
               type="button"
@@ -241,40 +165,11 @@ export function HotelServicesForm({
                 />
               </span>
             </button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              loading={isPending}
-              onClick={() => remove(service.id)}
-              aria-label={`Excluir ${service.name}`}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
           </div>
 
           {service.kind === "STAY" ? (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="space-y-1.5">
-                <Label>Quanto o tutor paga agora</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  defaultValue={String(service.depositAmount ?? "")}
-                  placeholder="Ex.: 50"
-                  onBlur={(event) => {
-                    const raw = event.target.value.trim();
-                    const next = raw === "" ? null : Number(raw);
-                    if (next !== service.depositAmount) {
-                      saveRow(service, { depositAmount: next });
-                    }
-                  }}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Se deixar vazio, o tutor não precisa pagar entrada agora.
-                </p>
-              </div>
+              <EntradaField service={service} saveRow={saveRow} />
               <div className="space-y-1.5">
                 <Label>Até que horas a diária vale</Label>
                 <Input
@@ -286,9 +181,6 @@ export function HotelServicesForm({
                     }
                   }}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Se o pet sair depois desse horário, cobra mais um dia.
-                </p>
               </div>
               <div className="space-y-1.5">
                 <Label>Quantos gatos no mesmo dia</Label>
@@ -340,30 +232,8 @@ export function HotelServicesForm({
                       }
                     }}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    É o limite da creche no mesmo horário.
-                  </p>
                 </div>
-                <div className="space-y-1.5">
-                  <Label>Quanto o tutor paga agora</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    defaultValue={String(service.depositAmount ?? "")}
-                    placeholder="Ex.: 50"
-                    onBlur={(event) => {
-                      const raw = event.target.value.trim();
-                      const next = raw === "" ? null : Number(raw);
-                      if (next !== service.depositAmount) {
-                        saveRow(service, { depositAmount: next });
-                      }
-                    }}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Se deixar vazio, o tutor não precisa pagar entrada agora.
-                  </p>
-                </div>
+                <EntradaField service={service} saveRow={saveRow} />
               </div>
               <WeekdayHoursEditor
                 weekdays={weekdayDrafts[service.id] ?? service.weekdays}
@@ -392,9 +262,6 @@ export function HotelServicesForm({
                       }
                     }}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Em minutos. Ex.: 30 abre horários de meia em meia hora.
-                  </p>
                 </div>
                 <div className="space-y-1.5">
                   <Label>Quantos pets no mesmo horário</Label>
@@ -411,29 +278,10 @@ export function HotelServicesForm({
                     }}
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <Label>Quanto o tutor paga agora</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    defaultValue={String(service.depositAmount ?? "")}
-                    placeholder="Ex.: 50"
-                    onBlur={(event) => {
-                      const raw = event.target.value.trim();
-                      const next = raw === "" ? null : Number(raw);
-                      if (next !== service.depositAmount) {
-                        saveRow(service, { depositAmount: next });
-                      }
-                    }}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Se deixar vazio, o tutor não precisa pagar entrada agora.
-                  </p>
-                </div>
+                <EntradaField service={service} saveRow={saveRow} />
               </div>
               <WeekdayHoursEditor
-                weekdays={weekdayDrafts[service.id] ?? service.weekdays}
+                weekdays={weekdayDrafts[service.id] ?? service.weekdays ?? defaultWeekdays()}
                 onChange={(weekdays) =>
                   setWeekdayDrafts((current) => ({ ...current, [service.id]: weekdays }))
                 }
@@ -459,49 +307,6 @@ export function HotelServicesForm({
           ) : null}
         </SettingsSection>
       ))}
-
-      <div className="grid gap-3 rounded-xl border border-dashed p-3 sm:grid-cols-[1fr_8rem_minmax(11rem,auto)_auto] sm:items-end">
-        <div className="space-y-1.5">
-          <Label htmlFor="new-service">Nome do serviço</Label>
-          <Input
-            id="new-service"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="Ex.: Hotel, Creche, Petsitter, Banho e tosa"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="new-price">Preço</Label>
-          <Input
-            id="new-price"
-            type="number"
-            min="1"
-            step="0.01"
-            value={price}
-            onChange={(event) => setPrice(event.target.value)}
-            placeholder="80"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Tipo</Label>
-          <Select value={kind} onValueChange={(value) => setKind(value as ServiceKind)}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(SERVICE_KIND_LABELS).map(([value, label]) => (
-                <SelectItem key={value} value={value}>
-                  {label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <Button type="button" className="w-full sm:w-auto" loading={isPending} onClick={addService}>
-          <Plus className="h-4 w-4" />
-          Cadastrar
-        </Button>
-      </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
       {services.some((service) => service.active) && (

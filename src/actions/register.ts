@@ -6,7 +6,6 @@ import { prisma } from "@/lib/prisma";
 import { createSession } from "@/lib/auth";
 import { defaultServicesCreate } from "@/lib/services";
 import { defaultBelongingsCreate, defaultVaccinesCreate } from "@/lib/check-in-catalog";
-import { defaultWeekdays } from "@/lib/schedule";
 import { phoneDigits, slugify } from "@/lib/utils";
 
 export async function registerHotel(input: {
@@ -77,9 +76,6 @@ export async function registerHotel(input: {
       },
       requiredVaccines: {
         create: defaultVaccinesCreate(),
-      },
-      weekdays: {
-        create: defaultWeekdays(),
       },
     },
     include: {

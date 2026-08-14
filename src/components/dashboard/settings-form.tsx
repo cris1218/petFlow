@@ -30,7 +30,6 @@ export type SettingsFormValues = {
   name: string;
   slug: string;
   whatsappNumber: string;
-  depositRate: number;
   pixConfigured: boolean;
   webhookUrl: string;
   logoUrl: string | null;
@@ -228,7 +227,7 @@ export function SettingsForm({
 
       <SettingsSection
         title="Serviços e preços"
-        description="Cadastre o que o hotel oferece. Hotel é pernoite, com entrada e saída. Creche e petsitter são só os dias de atendimento, sem horário de saída. Banho e tosa é hora marcada."
+        description="Hotel, creche, petsitter e banho e tosa já vêm prontos. Ative o que vocês fazem e diga o preço."
       >
         <HotelServicesForm initial={initial.services} />
       </SettingsSection>

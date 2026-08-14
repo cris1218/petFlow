@@ -22,7 +22,7 @@ function createPrismaClient() {
 
 function getPrismaClient() {
   const cached = globalForPrisma.prisma;
-  if (cached?.tenantWeekday) {
+  if (cached) {
     return cached;
   }
 

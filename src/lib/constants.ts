@@ -2,11 +2,6 @@ export const APP_NAME = "PetFlow";
 export const APP_SLOGAN =
   "Hospedagem, agendamentos e diário de bordo direto no WhatsApp.";
 
-export const LOGO_UPLOAD_HINT =
-  "PNG com fundo transparente (recomendado), quadrado 400×400 px até 800×800 px, máximo 2 MB. Assim o logo cabe no topo sem estourar a tela. WEBP também serve; evite JPG com fundo branco.";
-
-export const DEPOSIT_RATE = 0.3;
-
 export const QUICK_STATUS_NOTES = [
   "Já almoçou",
   "Brincando no jardim",
@@ -47,7 +42,6 @@ export const SIZE_LABELS = {
 export type PetSize = keyof typeof SIZE_LABELS;
 
 export const PET_SIZES: PetSize[] = ["SMALL", "MEDIUM", "LARGE"];
-export const DOG_SIZES: PetSize[] = PET_SIZES;
 
 export type PetPolicy = {
   acceptsCats: boolean;

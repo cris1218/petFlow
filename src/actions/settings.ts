@@ -6,6 +6,7 @@ import { requireHotelAdminSession } from "@/lib/auth";
 import { encryptSecret } from "@/lib/secrets";
 import { deleteHotelLogo, uploadHotelLogo } from "@/lib/cloudinary";
 import {
+  FIXED_SERVICES,
   ensureTenantServices,
   serializeTenantService,
 } from "@/lib/services";
@@ -13,9 +14,7 @@ import {
   TIME_PATTERN,
   WEEKDAY_ORDER,
   defaultWeekdays,
-  inferServiceKind,
   isTimedService,
-  type ServiceKind,
   type WeekdayHours,
 } from "@/lib/schedule";
 import {
@@ -37,7 +36,10 @@ export async function getTenantSettings() {
   await ensureTenantSchedule(tenant.id);
 
   const services = await prisma.tenantService.findMany({
-    where: { tenantId: tenant.id },
+    where: {
+      tenantId: tenant.id,
+      name: { in: FIXED_SERVICES.map((service) => service.name) },
+    },
     include: { weekdays: true },
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
   });
@@ -47,7 +49,6 @@ export async function getTenantSettings() {
     name: tenant.name,
     slug: tenant.slug,
     whatsappNumber: tenant.whatsappNumber ?? "",
-    depositRate: Number(tenant.depositRate),
     pixConfigured: Boolean(tenant.mpAccessTokenEnc),
     logoUrl: tenant.logoUrl,
     services: services.map(serializeTenantService),
@@ -66,22 +67,6 @@ export async function saveHotelWhatsApp(whatsappNumber: string) {
   await prisma.tenant.update({
     where: { id: tenantId },
     data: { whatsappNumber: digits || null },
-  });
-
-  revalidateHotel(user.tenant.slug);
-  return { ok: true as const };
-}
-
-export async function saveDepositRate(depositRate: number) {
-  const { tenantId, user } = await requireHotelAdminSession();
-
-  if (depositRate <= 0 || depositRate > 1) {
-    return { ok: false as const, error: "O sinal deve ser um percentual entre 1% e 100%." };
-  }
-
-  await prisma.tenant.update({
-    where: { id: tenantId },
-    data: { depositRate },
   });
 
   revalidateHotel(user.tenant.slug);
@@ -148,64 +133,10 @@ type ServiceAgendaInput = {
   weekdays?: WeekdayHours[];
 };
 
-export async function createTenantService(input: {
-  name: string;
-  price: number;
-  kind?: ServiceKind;
-} & ServiceAgendaInput) {
-  const { tenantId, user } = await requireHotelAdminSession();
-  const name = input.name.trim();
-  const price = Number(input.price);
-  const kind = input.kind ?? inferServiceKind(name);
-
-  if (name.length < 2) {
-    return { ok: false as const, error: "Informe o nome do serviço." };
-  }
-  if (!Number.isFinite(price) || price <= 0) {
-    return { ok: false as const, error: "Informe um valor maior que zero." };
-  }
-
-  const last = await prisma.tenantService.findFirst({
-    where: { tenantId },
-    orderBy: { sortOrder: "desc" },
-    select: { sortOrder: true },
-  });
-
-  const parsedDays = isTimedService(kind) ? parseWeekdays(input.weekdays ?? defaultWeekdays()) : null;
-  if (parsedDays && !parsedDays.ok) return parsedDays;
-
-  const service = await prisma.tenantService.create({
-    data: {
-      tenantId,
-      name,
-      price,
-      kind,
-      active: true,
-      sortOrder: (last?.sortOrder ?? -1) + 1,
-      dailyCutoffTime: input.dailyCutoffTime || "12:00",
-      depositAmount: input.depositAmount || null,
-      catCapacity: Math.max(0, Math.floor(Number(input.catCapacity ?? 10))),
-      dogCapacity: Math.max(0, Math.floor(Number(input.dogCapacity ?? 10))),
-      periodCapacity: Math.max(1, Math.floor(Number(input.periodCapacity ?? 10))),
-      slotDurationMin: Math.max(15, Math.floor(Number(input.slotDurationMin ?? 30))),
-      slotCapacity: Math.max(1, Math.floor(Number(input.slotCapacity ?? 1))),
-      weekdays: parsedDays?.ok
-        ? { create: parsedDays.data }
-        : undefined,
-    },
-    include: { weekdays: true },
-  });
-
-  revalidateHotel(user.tenant.slug);
-  return { ok: true as const, service: serializeTenantService(service) };
-}
-
 export async function updateTenantService(input: {
   id: string;
-  name?: string;
   price?: number;
   active?: boolean;
-  kind?: ServiceKind;
 } & ServiceAgendaInput) {
   const { tenantId, user } = await requireHotelAdminSession();
   const current = await prisma.tenantService.findFirst({
@@ -216,27 +147,19 @@ export async function updateTenantService(input: {
     return { ok: false as const, error: "Serviço não encontrado." };
   }
 
-  const name = input.name?.trim();
-  if (name !== undefined && name.length < 2) {
-    return { ok: false as const, error: "Informe o nome do serviço." };
-  }
-
   const price = input.price;
   if (price !== undefined && (!Number.isFinite(price) || price <= 0)) {
     return { ok: false as const, error: "Informe um valor maior que zero." };
   }
 
-  const kind = input.kind ?? current.kind;
   const parsedDays = input.weekdays ? parseWeekdays(input.weekdays) : null;
   if (parsedDays && !parsedDays.ok) return parsedDays;
 
   const service = await prisma.tenantService.update({
     where: { id: current.id },
     data: {
-      ...(name !== undefined ? { name } : {}),
       ...(price !== undefined ? { price } : {}),
       ...(input.active !== undefined ? { active: input.active } : {}),
-      ...(input.kind !== undefined ? { kind: input.kind } : {}),
       ...(input.dailyCutoffTime !== undefined
         ? { dailyCutoffTime: input.dailyCutoffTime }
         : {}),
@@ -268,8 +191,8 @@ export async function updateTenantService(input: {
     include: { weekdays: true },
   });
 
-  if (isTimedService(kind)) {
-    await ensureServiceWeekdays(service.id, tenantId);
+  if (isTimedService(current.kind)) {
+    await ensureServiceWeekdays(service.id);
   }
 
   revalidateHotel(user.tenant.slug);
@@ -278,22 +201,6 @@ export async function updateTenantService(input: {
     include: { weekdays: true },
   });
   return { ok: true as const, service: serializeTenantService(withDays ?? service) };
-}
-
-export async function deleteTenantService(id: string) {
-  const { tenantId, user } = await requireHotelAdminSession();
-  const current = await prisma.tenantService.findFirst({
-    where: { id, tenantId },
-    select: { id: true },
-  });
-
-  if (!current) {
-    return { ok: false as const, error: "Serviço não encontrado." };
-  }
-
-  await prisma.tenantService.delete({ where: { id: current.id } });
-  revalidateHotel(user.tenant.slug);
-  return { ok: true as const };
 }
 
 const ALLOWED_LOGO_TYPES = new Set([

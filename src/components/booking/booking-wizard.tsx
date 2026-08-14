@@ -44,7 +44,7 @@ import { formatBRL, formatBookingWhen, formatDate, formatFullAddress, phoneDigit
 import { lookupCep } from "@/lib/cep";
 import { CpfInput } from "@/components/ui/cpf-input";
 import { CepInput } from "@/components/ui/cep-input";
-import { SERVICE_KIND_LABELS, eachDateKey, effectiveServiceKind, toDateKey } from "@/lib/schedule";
+import { eachDateKey, effectiveServiceKind, toDateKey } from "@/lib/schedule";
 import { useFeedback } from "@/components/app-feedback";
 
 const STEPS = [
@@ -525,9 +525,6 @@ export function BookingWizard({
                           ? " / dia"
                           : " / diária"}
                     </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {SERVICE_KIND_LABELS[service.kind]}
-                    </p>
                   </button>
                 ))}
               </div>
@@ -590,13 +587,6 @@ export function BookingWizard({
               </div>
             ) : isDaycare ? (
               <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Dias de atendimento</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Só os dias em que o pet vai ser atendido. Não tem entrada, saída nem
-                    horário de saída.
-                  </p>
-                </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="start">De</Label>

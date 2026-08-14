@@ -11,10 +11,6 @@ export function isTimedService(kind: ServiceKind) {
   return kind === "DAYCARE" || kind === "APPOINTMENT";
 }
 
-export function isStayLike(kind: ServiceKind) {
-  return kind === "STAY" || kind === "DAYCARE";
-}
-
 export const WEEKDAY_LABELS: Record<number, string> = {
   1: "Segunda",
   2: "Terça",

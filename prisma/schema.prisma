@@ -82,13 +82,6 @@ model Tenant {
   whatsappConnected    Boolean      @default(false)
   mpAccessTokenEnc     String?
   logoUrl              String?
-  hotelRate            Decimal      @default(80) @db.Decimal(10, 2)
-  daycareRate          Decimal      @default(50) @db.Decimal(10, 2)
-  groomingRate         Decimal      @default(70) @db.Decimal(10, 2)
-  depositRate          Decimal      @default(0.30) @db.Decimal(4, 2)
-  stayCapacity         Int          @default(10)
-  appointmentCapacity  Int          @default(1)
-  slotDurationMin      Int          @default(60)
   acceptsCats          Boolean      @default(true)
   acceptsCatSmall      Boolean      @default(true)
   acceptsCatMedium     Boolean      @default(true)
@@ -113,7 +106,6 @@ model Tenant {
   services              TenantService[]
   belongings            TenantBelonging[]
   requiredVaccines      TenantRequiredVaccine[]
-  weekdays              TenantWeekday[]
 
   @@index([status])
 }
@@ -179,20 +171,6 @@ model TenantServiceWeekday {
 
   @@unique([serviceId, weekday])
   @@index([serviceId])
-}
-
-model TenantWeekday {
-  id        String  @id @default(cuid())
-  tenantId  String
-  weekday   Int
-  openTime  String  @default("08:00")
-  closeTime String  @default("18:00")
-  closed    Boolean @default(false)
-
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@unique([tenantId, weekday])
-  @@index([tenantId])
 }
 
 model PlatformSettings {

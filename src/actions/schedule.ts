@@ -115,8 +115,3 @@ export async function saveHotelSchedule(input: {
   revalidatePath(`/agendar/${user.tenant.slug}`);
   return { ok: true as const };
 }
-
-export async function getHotelSchedule() {
-  const { tenantId } = await requireHotelAdminSession();
-  return getTenantScheduleConfig(tenantId);
-}

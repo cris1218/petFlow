@@ -1,11 +1,16 @@
 import { prisma } from "@/lib/prisma";
 import { defaultWeekdays, effectiveServiceKind, type ServiceKind } from "@/lib/schedule";
 
-export const DEFAULT_TENANT_SERVICES = [
-  { name: "Hotel", price: 80, sortOrder: 0, kind: "STAY" as const },
-  { name: "Creche", price: 50, sortOrder: 1, kind: "DAYCARE" as const },
-  { name: "Banho e tosa", price: 70, sortOrder: 2, kind: "APPOINTMENT" as const },
+export const FIXED_SERVICES = [
+  { key: "hotel", name: "Hotel", kind: "STAY" as const, price: 80, sortOrder: 0 },
+  { key: "creche", name: "Creche / diária", kind: "DAYCARE" as const, price: 50, sortOrder: 1 },
+  { key: "petsitter", name: "Petsitter", kind: "DAYCARE" as const, price: 50, sortOrder: 2 },
+  { key: "grooming", name: "Banho e tosa", kind: "APPOINTMENT" as const, price: 70, sortOrder: 3 },
 ] as const;
+
+export type FixedServiceKey = (typeof FIXED_SERVICES)[number]["key"];
+
+export const DEFAULT_TENANT_SERVICES = FIXED_SERVICES;
 
 type ServiceRow = {
   id: string;
@@ -29,63 +34,94 @@ type ServiceRow = {
   }>;
 };
 
-export function defaultServicesCreate(
-  rates?: {
-    hotelRate?: { toString(): string } | number;
-    daycareRate?: { toString(): string } | number;
-    groomingRate?: { toString(): string } | number;
-  },
-) {
-  return [
-    {
-      name: "Hotel",
-      price: Number(rates?.hotelRate ?? DEFAULT_TENANT_SERVICES[0].price),
-      sortOrder: 0,
-      active: true,
-      kind: "STAY" as const,
-      dailyCutoffTime: "12:00",
-      catCapacity: 10,
-      dogCapacity: 10,
-    },
-    {
-      name: "Creche",
-      price: Number(rates?.daycareRate ?? DEFAULT_TENANT_SERVICES[1].price),
-      sortOrder: 1,
-      active: true,
-      kind: "DAYCARE" as const,
-      periodCapacity: 10,
-      weekdays: { create: defaultWeekdays() },
-    },
-    {
-      name: "Banho e tosa",
-      price: Number(rates?.groomingRate ?? DEFAULT_TENANT_SERVICES[2].price),
-      sortOrder: 2,
-      active: true,
-      kind: "APPOINTMENT" as const,
-      slotDurationMin: 30,
-      slotCapacity: 1,
-      weekdays: { create: defaultWeekdays() },
-    },
-  ];
+function serviceCreateData(spec: (typeof FIXED_SERVICES)[number]) {
+  const base = {
+    name: spec.name,
+    price: spec.price,
+    sortOrder: spec.sortOrder,
+    active: true,
+    kind: spec.kind,
+  };
+  if (spec.kind === "STAY") {
+    return { ...base, dailyCutoffTime: "12:00", catCapacity: 10, dogCapacity: 10 };
+  }
+  if (spec.kind === "DAYCARE") {
+    return { ...base, periodCapacity: 10, weekdays: { create: defaultWeekdays() } };
+  }
+  return {
+    ...base,
+    slotDurationMin: 30,
+    slotCapacity: 1,
+    weekdays: { create: defaultWeekdays() },
+  };
 }
 
-export async function ensureTenantServices(tenant: {
-  id: string;
-  hotelRate?: { toString(): string } | number;
-  daycareRate?: { toString(): string } | number;
-  groomingRate?: { toString(): string } | number;
-}) {
-  const count = await prisma.tenantService.count({
-    where: { tenantId: tenant.id },
-  });
-  if (count > 0) return;
+export function defaultServicesCreate() {
+  return FIXED_SERVICES.map(serviceCreateData);
+}
 
-  for (const service of defaultServicesCreate(tenant)) {
-    await prisma.tenantService.create({
+export function matchFixedServiceKey(name: string, kind: ServiceKind): FixedServiceKey | null {
+  const normalized = name.trim().toLowerCase();
+  if (normalized === "banho e tosa" || /(banho|tosa|groom)/i.test(name)) return "grooming";
+  if (normalized === "petsitter" || /(petsit|pet[\s-]?sitter)/i.test(name)) return "petsitter";
+  if (
+    normalized === "creche / diária" ||
+    normalized === "creche / diaria" ||
+    normalized === "creche" ||
+    /(creche|day\s?care)/i.test(name)
+  ) {
+    return "creche";
+  }
+  if (normalized === "hotel" || kind === "STAY") return "hotel";
+  if (kind === "APPOINTMENT") return "grooming";
+  if (kind === "DAYCARE") return "creche";
+  return null;
+}
+
+export async function ensureTenantServices(tenant: { id: string }) {
+  const existing = await prisma.tenantService.findMany({
+    where: { tenantId: tenant.id },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+  });
+
+  const assigned = new Map<FixedServiceKey, string>();
+
+  for (const service of existing) {
+    const key = matchFixedServiceKey(
+      service.name,
+      effectiveServiceKind(service.kind, service.name),
+    );
+    if (!key || assigned.has(key)) continue;
+    assigned.set(key, service.id);
+  }
+
+  for (const spec of FIXED_SERVICES) {
+    const id = assigned.get(spec.key);
+    if (!id) {
+      await prisma.tenantService.create({
+        data: {
+          ...serviceCreateData(spec),
+          tenantId: tenant.id,
+        },
+      });
+      continue;
+    }
+    await prisma.tenantService.update({
+      where: { id },
       data: {
-        ...service,
-        tenantId: tenant.id,
+        name: spec.name,
+        kind: spec.kind,
+        sortOrder: spec.sortOrder,
       },
+    });
+  }
+
+  const kept = new Set(assigned.values());
+  const extras = existing.filter((service) => !kept.has(service.id));
+  if (extras.length) {
+    await prisma.tenantService.updateMany({
+      where: { id: { in: extras.map((service) => service.id) } },
+      data: { active: false },
     });
   }
 }

@@ -31,52 +31,34 @@ export function serializeWeekday(row: {
   };
 }
 
-async function copyTenantWeekdaysToService(serviceId: string, tenantId: string) {
+async function copyTenantWeekdaysToService(serviceId: string) {
   const existing = await prisma.tenantService.findUnique({
     where: { id: serviceId },
     select: { weekdays: { select: { id: true }, take: 1 } },
   });
   if (existing?.weekdays.length) return;
 
-  const tenantDays = await prisma.tenantWeekday.findMany({
-    where: { tenantId },
-  });
-  const source = tenantDays.length ? tenantDays.map(serializeWeekday) : defaultWeekdays();
   await prisma.tenantService.update({
     where: { id: serviceId },
     data: {
       weekdays: {
-        create: source,
+        create: defaultWeekdays(),
       },
     },
   });
 }
 
-export async function ensureServiceWeekdays(serviceId: string, tenantId: string) {
-  await copyTenantWeekdaysToService(serviceId, tenantId);
+export async function ensureServiceWeekdays(serviceId: string) {
+  await copyTenantWeekdaysToService(serviceId);
 }
 
 export async function ensureTenantSchedule(tenantId: string) {
   const tenant = await prisma.tenant.findUnique({
     where: { id: tenantId },
-    select: {
-      stayCapacity: true,
-      weekdays: { select: { id: true }, take: 1 },
-    },
+    select: { id: true },
   });
 
   if (!tenant) return;
-
-  if (tenant.weekdays.length === 0) {
-    await prisma.tenant.update({
-      where: { id: tenantId },
-      data: {
-        weekdays: {
-          create: defaultWeekdays(),
-        },
-      },
-    });
-  }
 
   await prisma.tenantService.updateMany({
     where: {
@@ -91,7 +73,7 @@ export async function ensureTenantSchedule(tenantId: string) {
         { name: { contains: "pet-sitter", mode: "insensitive" } },
       ],
     },
-    data: { kind: "DAYCARE", periodCapacity: tenant.stayCapacity || 10 },
+    data: { kind: "DAYCARE", periodCapacity: 10 },
   });
 
   const timed = await prisma.tenantService.findMany({
@@ -99,7 +81,7 @@ export async function ensureTenantSchedule(tenantId: string) {
     select: { id: true },
   });
   for (const service of timed) {
-    await copyTenantWeekdaysToService(service.id, tenantId);
+    await copyTenantWeekdaysToService(service.id);
   }
 }
 
@@ -159,7 +141,7 @@ async function getServiceSchedule(
   const kind = effectiveServiceKind(service.kind, service.name);
 
   if (kind !== "STAY" && service.weekdays.length === 0) {
-    await copyTenantWeekdaysToService(service.id, tenantId);
+    await copyTenantWeekdaysToService(service.id);
     const again = await prisma.tenantService.findFirst({
       where: { id: service.id },
       include: { weekdays: true },
