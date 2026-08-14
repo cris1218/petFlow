@@ -76,8 +76,10 @@ export function DailyLogCard({ stays, queue }: DailyLogCardProps) {
   const [preview, setPreview] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [isQueuePending, startQueue] = useTransition();
+  const [, startItem] = useTransition();
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const previewUrlRef = useRef<string | null>(null);
@@ -139,7 +141,7 @@ export function DailyLogCard({ stays, queue }: DailyLogCardProps) {
     );
     formData.set("photo", file);
 
-    startTransition(async () => {
+    startQueue(async () => {
       setError(null);
       const result = await createDailyLog(formData);
       if (!result.ok) {
@@ -157,7 +159,7 @@ export function DailyLogCard({ stays, queue }: DailyLogCardProps) {
 
   function handleSendNow(logId: string) {
     setSendingId(logId);
-    startTransition(async () => {
+    startItem(async () => {
       const result = await sendQueuedDailyLog(logId);
       setSendingId(null);
       if (!result.ok) {
@@ -169,8 +171,10 @@ export function DailyLogCard({ stays, queue }: DailyLogCardProps) {
   }
 
   function handleRemove(logId: string) {
-    startTransition(async () => {
+    setRemovingId(logId);
+    startItem(async () => {
       const result = await removeQueuedDailyLog(logId);
+      setRemovingId(null);
       if (!result.ok) {
         setError(result.error);
         return;
@@ -306,9 +310,9 @@ export function DailyLogCard({ stays, queue }: DailyLogCardProps) {
               />
             </div>
 
-            <Button onClick={handleQueue} loading={isPending} className="w-full sm:w-auto">
+            <Button onClick={handleQueue} loading={isQueuePending} className="w-full sm:w-auto">
               <Clock className="h-4 w-4" />
-              {isPending ? "Adicionando..." : "Adicionar à fila"}
+              {isQueuePending ? "Adicionando..." : "Adicionar à fila"}
             </Button>
 
             {error && (
@@ -370,7 +374,8 @@ export function DailyLogCard({ stays, queue }: DailyLogCardProps) {
                     <Button
                       type="button"
                       size="sm"
-                      loading={isPending && sendingId === item.id}
+                      loading={sendingId === item.id}
+                      disabled={removingId === item.id}
                       onClick={() => handleSendNow(item.id)}
                     >
                       <Send className="h-4 w-4" />
@@ -380,10 +385,11 @@ export function DailyLogCard({ stays, queue }: DailyLogCardProps) {
                       type="button"
                       size="sm"
                       variant="outline"
-                      disabled={isPending}
+                      loading={removingId === item.id}
+                      disabled={sendingId === item.id}
                       onClick={() => handleRemove(item.id)}
                     >
-                      Tirar da fila
+                      {removingId === item.id ? "Tirando..." : "Tirar da fila"}
                     </Button>
                   </div>
                 </div>
