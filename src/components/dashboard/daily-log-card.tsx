@@ -45,12 +45,14 @@ type DailyLogCardProps = {
 
 export function DailyLogCard({ stays }: DailyLogCardProps) {
   const [bookingId, setBookingId] = useState(stays[0]?.bookingId ?? "");
-  const [statusNote, setStatusNote] = useState<string>(QUICK_STATUS_NOTES[0]);
+  const [statusNote, setStatusNote] = useState("");
   const [preview, setPreview] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const previewUrlRef = useRef<string | null>(null);
   const { success } = useFeedback();
 
   const selected = useMemo(
@@ -58,16 +60,40 @@ export function DailyLogCard({ stays }: DailyLogCardProps) {
     [stays, bookingId],
   );
 
+  function clearPhoto() {
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
+    }
+    setFile(null);
+    setPreview(null);
+    if (fileRef.current) fileRef.current.value = "";
+    if (cameraRef.current) cameraRef.current.value = "";
+  }
+
+  function resetFormKeepPet() {
+    clearPhoto();
+    setStatusNote("");
+    setError(null);
+  }
+
   function onFileChange(nextFile: File | undefined) {
     if (!nextFile) return;
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    const url = URL.createObjectURL(nextFile);
+    previewUrlRef.current = url;
     setFile(nextFile);
-    setPreview(URL.createObjectURL(nextFile));
+    setPreview(url);
     setError(null);
   }
 
   function handleSubmit() {
     if (!bookingId || !file) {
       setError("Selecione o pet e uma foto para enviar o diário.");
+      return;
+    }
+    if (!statusNote) {
+      setError("Escolha um status rápido.");
       return;
     }
 
@@ -88,8 +114,7 @@ export function DailyLogCard({ stays }: DailyLogCardProps) {
           ? "Diário enviado com sucesso."
           : "Diário salvo com sucesso. O WhatsApp não confirmou o envio.",
       );
-      setFile(null);
-      setPreview(result.photoUrl);
+      resetFormKeepPet();
     });
   }
 
@@ -172,23 +197,27 @@ export function DailyLogCard({ stays }: DailyLogCardProps) {
               <Upload className="h-4 w-4" />
               Subir foto
             </Button>
-            <label className="inline-flex w-full sm:w-auto">
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                onChange={(event) => onFileChange(event.target.files?.[0])}
-              />
-              <span className="inline-flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-muted sm:w-auto">
-                <Camera className="h-4 w-4" />
-                Tirar foto
-              </span>
-            </label>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={() => cameraRef.current?.click()}
+            >
+              <Camera className="h-4 w-4" />
+              Tirar foto
+            </Button>
             <input
               ref={fileRef}
               type="file"
               accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={(event) => onFileChange(event.target.files?.[0])}
+            />
+            <input
+              ref={cameraRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
               className="hidden"
               onChange={(event) => onFileChange(event.target.files?.[0])}
             />
