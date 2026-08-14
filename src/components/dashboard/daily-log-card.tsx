@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Camera, Clock, PawPrint, Send, Upload } from "lucide-react";
 import {
   createDailyLog,
+  flushDueDailyLogs,
   removeQueuedDailyLog,
   sendQueuedDailyLog,
 } from "@/actions/daily-logs";
@@ -82,6 +84,16 @@ export function DailyLogCard({ stays, queue }: DailyLogCardProps) {
   const cameraRef = useRef<HTMLInputElement>(null);
   const previewUrlRef = useRef<string | null>(null);
   const { success } = useFeedback();
+  const router = useRouter();
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      void flushDueDailyLogs().then((result) => {
+        if (result.sent > 0) router.refresh();
+      });
+    }, 30000);
+    return () => window.clearInterval(timer);
+  }, [router]);
 
   const selected = useMemo(
     () => stays.find((stay) => stay.bookingId === bookingId),

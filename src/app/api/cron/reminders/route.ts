@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { addDays, startOfDay, endOfDay } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppText, whatsappTemplates } from "@/lib/whatsapp";
-import { processDueDailyLogs } from "@/actions/daily-logs";
+import { processDueDailyLogs } from "@/lib/daily-log-dispatch";
 import { slugify } from "@/lib/utils";
 
 export const runtime = "nodejs";

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { processDueDailyLogs } from "@/actions/daily-logs";
+import { processDueDailyLogs } from "@/lib/daily-log-dispatch";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

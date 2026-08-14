@@ -1,15 +1,14 @@
 ---
-description: Depois de cada tarefa, build e commit se passar
+description: Depois de cada tarefa, build, commit e push se a build passar
 alwaysApply: true
 ---
 
-# Commit por tarefa
+# Commit e push por tarefa
 
-Ao terminar **cada tarefa** (não esperar o usuário pedir commit):
+Ao terminar **cada tarefa** (não esperar o usuário pedir):
 
 1. Rodar `yarn build`.
-2. Se passar, fazer o commit na hora, com mensagem curta focada no porquê.
+2. Se passar, fazer o commit e o `git push` para o `origin`, para a Vercel publicar.
 3. Se falhar, **não commitar**. Corrigir, repetir a build, só então commitar.
 
 Não usar `--no-verify`. Warnings de ESLint podem passar; erro de lint ou TypeScript cancela o commit.
-Não fazer `git push` a menos que o usuário peça.
