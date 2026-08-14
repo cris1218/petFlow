@@ -76,7 +76,13 @@ function formatRemaining(ms: number) {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
-function QueueCountdown({ scheduledAt }: { scheduledAt: Date | string }) {
+function QueueItemStatus({
+  scheduledAt,
+  sending,
+}: {
+  scheduledAt: Date | string;
+  sending?: boolean;
+}) {
   const target = new Date(scheduledAt).getTime();
   const [now, setNow] = useState<number | null>(null);
 
@@ -86,20 +92,25 @@ function QueueCountdown({ scheduledAt }: { scheduledAt: Date | string }) {
     return () => window.clearInterval(timer);
   }, []);
 
-  if (now === null) {
-    return <span>vai enviar em --:--:--</span>;
-  }
-
-  const remaining = target - now;
-  if (remaining <= 0) {
-    return <span>enviando agora</span>;
-  }
+  const due = Boolean(sending || (now !== null && target - now <= 0));
 
   return (
-    <span>
-      vai enviar em{" "}
-      <span className="tabular-nums">{formatRemaining(remaining)}</span>
-    </span>
+    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+      {due ? (
+        <Badge>Enviando agora</Badge>
+      ) : (
+        <Badge variant="warning">Aguardando envio</Badge>
+      )}
+      <span>Envia {formatDateTime(scheduledAt)}</span>
+      {!due && (
+        <span>
+          vai enviar em{" "}
+          <span className="tabular-nums">
+            {now === null ? "--:--:--" : formatRemaining(target - now)}
+          </span>
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -400,13 +411,10 @@ export function DailyLogCard({ stays, queue }: DailyLogCardProps) {
                     <p className="truncate font-medium">
                       {item.petName} · {item.statusNote}
                     </p>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      <Badge variant="warning">Aguardando envio</Badge>
-                      <span>Envia {formatDateTime(item.scheduledAt)}</span>
-                      <span>
-                        <QueueCountdown scheduledAt={item.scheduledAt} />
-                      </span>
-                    </div>
+                    <QueueItemStatus
+                      scheduledAt={item.scheduledAt}
+                      sending={sendingId === item.id}
+                    />
                   </div>
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <Button
