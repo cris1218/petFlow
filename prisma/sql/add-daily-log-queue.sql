@@ -1,0 +1,3 @@
+ALTER TABLE "DailyLog" ADD COLUMN IF NOT EXISTS "scheduledAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE "DailyLog" ADD COLUMN IF NOT EXISTS "sentAt" TIMESTAMP(3);
+CREATE INDEX IF NOT EXISTS "DailyLog_sentToWhatsApp_scheduledAt_idx" ON "DailyLog"("sentToWhatsApp", "scheduledAt");

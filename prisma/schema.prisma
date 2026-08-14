@@ -346,19 +346,22 @@ model Booking {
 }
 
 model DailyLog {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   tenantId       String
   bookingId      String
   photoUrl       String
   statusNote     String
-  sentToWhatsApp Boolean  @default(false)
-  createdAt      DateTime @default(now())
+  scheduledAt    DateTime  @default(now())
+  sentAt         DateTime?
+  sentToWhatsApp Boolean   @default(false)
+  createdAt      DateTime  @default(now())
 
   tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@index([bookingId])
+  @@index([sentToWhatsApp, scheduledAt])
 }
 
 model ChecklistItem {

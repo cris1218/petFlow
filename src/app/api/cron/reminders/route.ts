@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { addDays, startOfDay, endOfDay } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppText, whatsappTemplates } from "@/lib/whatsapp";
+import { processDueDailyLogs } from "@/actions/daily-logs";
 import { slugify } from "@/lib/utils";
 
 export const runtime = "nodejs";
@@ -58,5 +59,10 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, candidates: bookings.length, sent });
+  const result = await processDueDailyLogs();
+  return NextResponse.json({
+    ok: true,
+    reminders: { candidates: bookings.length, sent },
+    dailyLogs: result,
+  });
 }

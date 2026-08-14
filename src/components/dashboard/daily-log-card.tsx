@@ -1,11 +1,16 @@
 "use client";
 
 import { useMemo, useRef, useState, useTransition } from "react";
-import { Camera, PawPrint, Send, Upload } from "lucide-react";
-import { createDailyLog } from "@/actions/daily-logs";
+import { Camera, Clock, PawPrint, Send, Upload } from "lucide-react";
+import {
+  createDailyLog,
+  removeQueuedDailyLog,
+  sendQueuedDailyLog,
+} from "@/actions/daily-logs";
 import { QUICK_STATUS_NOTES, SPECIES_LABELS } from "@/lib/constants";
-import { formatWhatsAppMask } from "@/lib/utils";
+import { formatDateTime, formatWhatsAppMask } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Card,
   CardContent,
@@ -30,26 +35,49 @@ export type DailyLogStay = {
   species: "DOG" | "CAT" | "OTHER" | string;
   tutorName: string;
   tutorPhone: string;
-  recentLogs: Array<{
-    id: string;
-    photoUrl: string;
-    statusNote: string;
-    sentToWhatsApp: boolean;
-    createdAt: Date | string;
-  }>;
+};
+
+export type DailyLogQueueItem = {
+  id: string;
+  photoUrl: string;
+  statusNote: string;
+  scheduledAt: Date | string;
+  petName: string;
 };
 
 type DailyLogCardProps = {
   stays: DailyLogStay[];
+  queue: DailyLogQueueItem[];
 };
 
-export function DailyLogCard({ stays }: DailyLogCardProps) {
+function pad(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function localDateKey(date = new Date()) {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function localTimeValue(date = new Date()) {
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function addOneHour(dateKey: string, time: string) {
+  const next = new Date(`${dateKey}T${time}:00`);
+  next.setHours(next.getHours() + 1);
+  return { dateKey: localDateKey(next), time: localTimeValue(next) };
+}
+
+export function DailyLogCard({ stays, queue }: DailyLogCardProps) {
   const [bookingId, setBookingId] = useState(stays[0]?.bookingId ?? "");
   const [statusNote, setStatusNote] = useState("");
+  const [scheduledDate, setScheduledDate] = useState(localDateKey);
+  const [scheduledTime, setScheduledTime] = useState(localTimeValue);
   const [preview, setPreview] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [sendingId, setSendingId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const previewUrlRef = useRef<string | null>(null);
@@ -75,6 +103,9 @@ export function DailyLogCard({ stays }: DailyLogCardProps) {
     clearPhoto();
     setStatusNote("");
     setError(null);
+    const next = addOneHour(scheduledDate, scheduledTime);
+    setScheduledDate(next.dateKey);
+    setScheduledTime(next.time);
   }
 
   function onFileChange(nextFile: File | undefined) {
@@ -87,9 +118,9 @@ export function DailyLogCard({ stays }: DailyLogCardProps) {
     setError(null);
   }
 
-  function handleSubmit() {
+  function handleQueue() {
     if (!bookingId || !file) {
-      setError("Selecione o pet e uma foto para enviar o diário.");
+      setError("Selecione o pet e uma foto para agendar o diário.");
       return;
     }
     if (!statusNote) {
@@ -100,6 +131,8 @@ export function DailyLogCard({ stays }: DailyLogCardProps) {
     const formData = new FormData();
     formData.set("bookingId", bookingId);
     formData.set("statusNote", statusNote);
+    formData.set("scheduledDate", scheduledDate);
+    formData.set("scheduledTime", scheduledTime);
     formData.set("photo", file);
 
     startTransition(async () => {
@@ -109,12 +142,32 @@ export function DailyLogCard({ stays }: DailyLogCardProps) {
         setError(result.error);
         return;
       }
-      success(
-        result.sentToWhatsApp
-          ? "Diário enviado com sucesso."
-          : "Diário salvo com sucesso. O WhatsApp não confirmou o envio.",
-      );
+      success("Foto na fila, aguardando envio.");
       resetFormKeepPet();
+    });
+  }
+
+  function handleSendNow(logId: string) {
+    setSendingId(logId);
+    startTransition(async () => {
+      const result = await sendQueuedDailyLog(logId);
+      setSendingId(null);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      success("Diário enviado com sucesso.");
+    });
+  }
+
+  function handleRemove(logId: string) {
+    startTransition(async () => {
+      const result = await removeQueuedDailyLog(logId);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      success("Foto retirada da fila.");
     });
   }
 
@@ -142,100 +195,121 @@ export function DailyLogCard({ stays }: DailyLogCardProps) {
           Tire uma foto, escolha um status rápido e avise o tutor na hora.
         </CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-6 p-4 sm:p-6 lg:grid-cols-[1fr_280px]">
-        <div className="space-y-5">
-          <div className="space-y-2">
-            <Label htmlFor="pet">Pet hospedado</Label>
-            <Select value={bookingId} onValueChange={setBookingId}>
-              <SelectTrigger id="pet">
-                <SelectValue placeholder="Escolha o pet" />
-              </SelectTrigger>
-              <SelectContent>
-                {stays.map((stay) => (
-                  <SelectItem key={stay.bookingId} value={stay.bookingId}>
-                    {stay.petName} · {stay.tutorName}
-                  </SelectItem>
+      <CardContent className="space-y-6 p-4 sm:p-6">
+        <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="pet">Pet hospedado</Label>
+              <Select value={bookingId} onValueChange={setBookingId}>
+                <SelectTrigger id="pet">
+                  <SelectValue placeholder="Escolha o pet" />
+                </SelectTrigger>
+                <SelectContent>
+                  {stays.map((stay) => (
+                    <SelectItem key={stay.bookingId} value={stay.bookingId}>
+                      {stay.petName} · {stay.tutorName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selected && (
+                <p className="text-xs text-muted-foreground">
+                  {SPECIES_LABELS[selected.species as keyof typeof SPECIES_LABELS] ??
+                    selected.species}{" "}
+                  · WhatsApp {formatWhatsAppMask(selected.tutorPhone)}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Status rápido</Label>
+              <div className="flex flex-wrap gap-2">
+                {QUICK_STATUS_NOTES.map((note) => (
+                  <button
+                    key={note}
+                    type="button"
+                    onClick={() => setStatusNote(note)}
+                    className={`min-h-11 rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                      statusNote === note
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-input bg-background hover:bg-muted"
+                    }`}
+                  >
+                    {note}
+                  </button>
                 ))}
-              </SelectContent>
-            </Select>
-            {selected && (
-              <p className="text-xs text-muted-foreground">
-                {SPECIES_LABELS[selected.species as keyof typeof SPECIES_LABELS] ??
-                  selected.species}{" "}
-                · WhatsApp {formatWhatsAppMask(selected.tutorPhone)}
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="send-date">Dia do envio</Label>
+                <Input
+                  id="send-date"
+                  type="date"
+                  value={scheduledDate}
+                  onChange={(event) => setScheduledDate(event.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="send-time">Horário</Label>
+                <Input
+                  id="send-time"
+                  type="time"
+                  value={scheduledTime}
+                  onChange={(event) => setScheduledTime(event.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full sm:w-auto"
+                onClick={() => fileRef.current?.click()}
+              >
+                <Upload className="h-4 w-4" />
+                Subir foto
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full sm:w-auto"
+                onClick={() => cameraRef.current?.click()}
+              >
+                <Camera className="h-4 w-4" />
+                Tirar foto
+              </Button>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(event) => onFileChange(event.target.files?.[0])}
+              />
+              <input
+                ref={cameraRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(event) => onFileChange(event.target.files?.[0])}
+              />
+            </div>
+
+            <Button onClick={handleQueue} loading={isPending} className="w-full sm:w-auto">
+              <Clock className="h-4 w-4" />
+              {isPending ? "Adicionando..." : "Adicionar à fila"}
+            </Button>
+
+            {error && (
+              <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {error}
               </p>
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label>Status rápido</Label>
-            <div className="flex flex-wrap gap-2">
-              {QUICK_STATUS_NOTES.map((note) => (
-                <button
-                  key={note}
-                  type="button"
-                  onClick={() => setStatusNote(note)}
-                  className={`min-h-11 rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                    statusNote === note
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-input bg-background hover:bg-muted"
-                  }`}
-                >
-                  {note}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full sm:w-auto"
-              onClick={() => fileRef.current?.click()}
-            >
-              <Upload className="h-4 w-4" />
-              Subir foto
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full sm:w-auto"
-              onClick={() => cameraRef.current?.click()}
-            >
-              <Camera className="h-4 w-4" />
-              Tirar foto
-            </Button>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              className="hidden"
-              onChange={(event) => onFileChange(event.target.files?.[0])}
-            />
-            <input
-              ref={cameraRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={(event) => onFileChange(event.target.files?.[0])}
-            />
-          </div>
-
-          <Button onClick={handleSubmit} loading={isPending} className="w-full sm:w-auto">
-            <Send className="h-4 w-4" />
-            {isPending ? "Enviando..." : "Enviar Diário no WhatsApp"}
-          </Button>
-
-          {error && (
-            <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {error}
-            </p>
-          )}
-        </div>
-
-        <div className="space-y-3">
           <div className="aspect-square overflow-hidden rounded-xl border bg-muted">
             {preview ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -251,15 +325,61 @@ export function DailyLogCard({ stays }: DailyLogCardProps) {
               </div>
             )}
           </div>
-          {selected?.recentLogs[0] && (
-            <div className="rounded-lg border p-3 text-sm">
-              <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-                <span className="font-medium">Último envio</span>
-                <Badge variant={selected.recentLogs[0].sentToWhatsApp ? "success" : "warning"}>
-                  {selected.recentLogs[0].sentToWhatsApp ? "WhatsApp" : "Pendente"}
-                </Badge>
-              </div>
-              <p className="text-muted-foreground">{selected.recentLogs[0].statusNote}</p>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <h3 className="text-sm font-medium">Fila de envio</h3>
+            <p className="text-xs text-muted-foreground">
+              As fotos saem no horário agendado. Use enviar agora se quiser antecipar.
+            </p>
+          </div>
+          {queue.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhuma foto aguardando envio.</p>
+          ) : (
+            <div className="space-y-2">
+              {queue.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex flex-col gap-3 rounded-xl border p-3 sm:flex-row sm:items-center"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={item.photoUrl}
+                    alt={item.statusNote}
+                    className="h-16 w-16 shrink-0 rounded-lg object-cover"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">
+                      {item.petName} · {item.statusNote}
+                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      <Badge variant="warning">Aguardando envio</Badge>
+                      <span>Envia {formatDateTime(item.scheduledAt)}</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Button
+                      type="button"
+                      size="sm"
+                      loading={isPending && sendingId === item.id}
+                      onClick={() => handleSendNow(item.id)}
+                    >
+                      <Send className="h-4 w-4" />
+                      Enviar agora
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={isPending}
+                      onClick={() => handleRemove(item.id)}
+                    >
+                      Tirar da fila
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
