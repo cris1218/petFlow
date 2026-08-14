@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Camera, Clock, PawPrint, Send, Upload } from "lucide-react";
 import {
   createDailyLog,
@@ -66,6 +66,41 @@ function addOneHour(dateKey: string, time: string) {
   const next = new Date(`${dateKey}T${time}:00`);
   next.setHours(next.getHours() + 1);
   return { dateKey: localDateKey(next), time: localTimeValue(next) };
+}
+
+function formatRemaining(ms: number) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = total % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function QueueCountdown({ scheduledAt }: { scheduledAt: Date | string }) {
+  const target = new Date(scheduledAt).getTime();
+  const [now, setNow] = useState<number | null>(null);
+
+  useEffect(() => {
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  if (now === null) {
+    return <span>vai enviar em --:--:--</span>;
+  }
+
+  const remaining = target - now;
+  if (remaining <= 0) {
+    return <span>enviando agora</span>;
+  }
+
+  return (
+    <span>
+      vai enviar em{" "}
+      <span className="tabular-nums">{formatRemaining(remaining)}</span>
+    </span>
+  );
 }
 
 export function DailyLogCard({ stays, queue }: DailyLogCardProps) {
@@ -368,6 +403,9 @@ export function DailyLogCard({ stays, queue }: DailyLogCardProps) {
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                       <Badge variant="warning">Aguardando envio</Badge>
                       <span>Envia {formatDateTime(item.scheduledAt)}</span>
+                      <span>
+                        <QueueCountdown scheduledAt={item.scheduledAt} />
+                      </span>
                     </div>
                   </div>
                   <div className="flex flex-col gap-2 sm:flex-row">
