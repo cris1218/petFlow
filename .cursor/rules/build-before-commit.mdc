@@ -1,14 +1,15 @@
 ---
-description: Sempre rodar yarn build antes de commit; só commitar se passar
+description: Depois de cada tarefa, build e commit se passar
 alwaysApply: true
 ---
 
-# Build antes do commit
+# Commit por tarefa
 
-Antes de qualquer `git commit`:
+Ao terminar **cada tarefa** (não esperar o usuário pedir commit):
 
-1. Rodar `yarn build` (prisma generate + next build).
-2. Se a build **passar**, aí sim fazer o commit.
-3. Se a build **falhar**, **não commitar**. Corrigir o erro e repetir a build.
+1. Rodar `yarn build`.
+2. Se passar, fazer o commit na hora, com mensagem curta focada no porquê.
+3. Se falhar, **não commitar**. Corrigir, repetir a build, só então commitar.
 
-Não usar `--no-verify` nem pular esse passo. Warnings de ESLint podem passar; errors de lint/TypeScript cancelam o commit.
+Não usar `--no-verify`. Warnings de ESLint podem passar; erro de lint ou TypeScript cancela o commit.
+Não fazer `git push` a menos que o usuário peça.
