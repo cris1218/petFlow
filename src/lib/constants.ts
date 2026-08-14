@@ -46,29 +46,74 @@ export const SIZE_LABELS = {
 
 export type PetSize = keyof typeof SIZE_LABELS;
 
-export const DOG_SIZES: PetSize[] = ["SMALL", "MEDIUM", "LARGE"];
+export const PET_SIZES: PetSize[] = ["SMALL", "MEDIUM", "LARGE"];
+export const DOG_SIZES: PetSize[] = PET_SIZES;
 
 export type PetPolicy = {
   acceptsCats: boolean;
+  catSizes: PetSize[];
   dogSizes: PetSize[];
 };
+
+export function sizesFromFlags(flags: {
+  small: boolean;
+  medium: boolean;
+  large: boolean;
+}): PetSize[] {
+  const sizes: PetSize[] = [];
+  if (flags.small) sizes.push("SMALL");
+  if (flags.medium) sizes.push("MEDIUM");
+  if (flags.large) sizes.push("LARGE");
+  return sizes;
+}
 
 export function dogSizesFromFlags(flags: {
   acceptsDogSmall: boolean;
   acceptsDogMedium: boolean;
   acceptsDogLarge: boolean;
 }): PetSize[] {
-  const sizes: PetSize[] = [];
-  if (flags.acceptsDogSmall) sizes.push("SMALL");
-  if (flags.acceptsDogMedium) sizes.push("MEDIUM");
-  if (flags.acceptsDogLarge) sizes.push("LARGE");
-  return sizes;
+  return sizesFromFlags({
+    small: flags.acceptsDogSmall,
+    medium: flags.acceptsDogMedium,
+    large: flags.acceptsDogLarge,
+  });
+}
+
+export function catSizesFromFlags(flags: {
+  acceptsCats: boolean;
+  acceptsCatSmall?: boolean;
+  acceptsCatMedium?: boolean;
+  acceptsCatLarge?: boolean;
+}): PetSize[] {
+  if (!flags.acceptsCats) return [];
+  return sizesFromFlags({
+    small: flags.acceptsCatSmall ?? true,
+    medium: flags.acceptsCatMedium ?? true,
+    large: flags.acceptsCatLarge ?? true,
+  });
+}
+
+export function petPolicyFromTenant(tenant: {
+  acceptsCats: boolean;
+  acceptsCatSmall?: boolean;
+  acceptsCatMedium?: boolean;
+  acceptsCatLarge?: boolean;
+  acceptsDogSmall: boolean;
+  acceptsDogMedium: boolean;
+  acceptsDogLarge: boolean;
+}): PetPolicy {
+  const catSizes = catSizesFromFlags(tenant);
+  return {
+    acceptsCats: catSizes.length > 0,
+    catSizes,
+    dogSizes: dogSizesFromFlags(tenant),
+  };
 }
 
 export function allowedSpecies(policy: PetPolicy) {
   const species: Array<keyof typeof SPECIES_LABELS> = [];
   if (policy.dogSizes.length > 0) species.push("DOG");
-  if (policy.acceptsCats) species.push("CAT");
+  if (policy.catSizes.length > 0 || policy.acceptsCats) species.push("CAT");
   if (policy.dogSizes.length > 0) species.push("OTHER");
   return species;
 }
@@ -77,7 +122,7 @@ export function sizesForSpecies(
   species: keyof typeof SPECIES_LABELS,
   policy: PetPolicy,
 ): PetSize[] {
-  if (species === "CAT") return policy.acceptsCats ? ["SMALL"] : [];
+  if (species === "CAT") return policy.catSizes.length ? policy.catSizes : policy.acceptsCats ? PET_SIZES : [];
   return policy.dogSizes;
 }
 

@@ -19,7 +19,7 @@ export default async function AdminSupportTicketPage({
   const { ticket } = result;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="space-y-6">
       <div>
         <Link
           href="/admin/suporte"

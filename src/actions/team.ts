@@ -61,6 +61,7 @@ export async function createHotelStaff(input: {
   });
 
   revalidatePath("/dashboard/equipe");
+  revalidatePath("/dashboard/configuracoes");
   return {
     ok: true as const,
     user,
@@ -94,6 +95,7 @@ export async function resetStaffPassword(input: {
   });
 
   revalidatePath("/dashboard/equipe");
+  revalidatePath("/dashboard/configuracoes");
   return {
     ok: true as const,
     email: user.email,
@@ -129,5 +131,6 @@ export async function removeHotelStaff(userId: string) {
   }
 
   revalidatePath("/dashboard/equipe");
+  revalidatePath("/dashboard/configuracoes");
   return { ok: true as const };
 }

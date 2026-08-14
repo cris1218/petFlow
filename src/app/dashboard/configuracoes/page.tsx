@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { requireHotelAdminSession } from "@/lib/auth";
 import { getTenantSettings } from "@/actions/settings";
 import { getWhatsAppConnection } from "@/actions/whatsapp";
+import { listHotelStaff } from "@/actions/team";
+import { getAccountProfile } from "@/actions/auth";
 import { SettingsForm } from "@/components/dashboard/settings-form";
 import { getAppUrl } from "@/lib/app-url";
 
@@ -12,17 +14,20 @@ export default async function SettingsPage() {
     redirect("/dashboard");
   }
 
-  const [settings, connection] = await Promise.all([
+  const [settings, connection, staff, profile] = await Promise.all([
     getTenantSettings(),
     getWhatsAppConnection(),
+    listHotelStaff(),
+    getAccountProfile(),
   ]);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="space-y-6">
       <div>
         <h1 className="text-xl font-semibold sm:text-2xl">Configurações</h1>
         <p className="text-sm text-muted-foreground">
-          Logo, serviços, agenda, WhatsApp e Mercado Pago da conta do hotel.
+          Abra cada item para ajustar. Tudo aqui vale para a agenda do cliente e
+          para o dia a dia do hotel.
         </p>
       </div>
       <SettingsForm
@@ -35,6 +40,8 @@ export default async function SettingsPage() {
           number: connection.number,
           instanceName: connection.instanceName,
         }}
+        staff={staff}
+        accountEmail={profile.email}
       />
     </div>
   );

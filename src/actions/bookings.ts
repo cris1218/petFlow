@@ -9,8 +9,8 @@ import { createPixDeposit, resolveMercadoPagoToken } from "@/lib/mercadopago";
 import { requireStaffSession } from "@/lib/auth";
 import { assertOwnedBooking } from "@/lib/tenant";
 import { sendWhatsAppText, whatsappTemplates } from "@/lib/whatsapp";
-import { toDateKey } from "@/lib/schedule";
-import { dogSizesFromFlags, hasPetCareProfile, sizesForSpecies } from "@/lib/constants";
+import { eachDateKey, effectiveServiceKind, toDateKey } from "@/lib/schedule";
+import { petPolicyFromTenant, hasPetCareProfile, sizesForSpecies } from "@/lib/constants";
 import { assertSlotAvailable } from "@/lib/tenant-schedule";
 import { cpfDigits, phoneDigits, pixPayerEmail } from "@/lib/utils";
 
@@ -20,6 +20,7 @@ export type CreateBookingInput = {
   startDate: string;
   endDate: string;
   slotTime?: string;
+  checkoutTime?: string;
   tutor: {
     name: string;
     phone: string;
@@ -72,6 +73,34 @@ function resolvePixPayer(pix?: { kind: "CPF" | "EMAIL" | "PHONE"; key: string })
   return { ok: true as const, email: pixPayerEmail("PHONE", digits), cpf: undefined };
 }
 
+async function sendBookingConfirmedWhatsApp(input: {
+  tenant: { slug: string; whatsappInstanceName: string | null };
+  tutorName: string;
+  tutorPhone: string;
+  petName: string;
+  startDate: Date;
+  endDate: Date;
+  slotTime?: string | null;
+}) {
+  const instanceName =
+    input.tenant.whatsappInstanceName ?? `petflow_${input.tenant.slug}`;
+  try {
+    await sendWhatsAppText({
+      instanceName,
+      phone: input.tutorPhone,
+      text: whatsappTemplates.confirmation({
+        tutorName: input.tutorName,
+        petName: input.petName,
+        startDate: input.startDate,
+        endDate: input.endDate,
+        slotTime: input.slotTime,
+      }),
+    });
+  } catch (error) {
+    console.error("[confirm-booking] whatsapp", error);
+  }
+}
+
 export async function createBooking(input: CreateBookingInput) {
   const parsed = createBookingSchema.safeParse(input);
 
@@ -117,27 +146,15 @@ export async function createBooking(input: CreateBookingInput) {
 
   const accessToken = resolveMercadoPagoToken(tenant);
   const pixPayer = resolvePixPayer(data.tutor.pix);
-  if (accessToken) {
-    if (!pixPayer) {
-      return {
-        ok: false as const,
-        error: "Informe a chave PIX: CPF, e-mail ou celular.",
-      };
-    }
-    if (!pixPayer.ok) return pixPayer;
-  }
 
-  const policy = {
-    acceptsCats: tenant.acceptsCats,
-    dogSizes: dogSizesFromFlags(tenant),
-  };
-  if (data.pet.species === "CAT" && !policy.acceptsCats) {
+  const policy = petPolicyFromTenant(tenant);
+  if (data.pet.species === "CAT" && policy.catSizes.length === 0) {
     return { ok: false as const, error: "Este hotel não atende gatos." };
   }
   if (data.pet.species !== "CAT" && policy.dogSizes.length === 0) {
     return { ok: false as const, error: "Este hotel não atende cães." };
   }
-  const petSize = data.pet.species === "CAT" ? "SMALL" : data.pet.size;
+  const petSize = data.pet.size;
   if (!sizesForSpecies(data.pet.species, policy).includes(petSize)) {
     return { ok: false as const, error: "Este hotel não atende esse porte." };
   }
@@ -154,12 +171,15 @@ export async function createBooking(input: CreateBookingInput) {
     return { ok: false as const, error: "Esse serviço não está disponível." };
   }
 
-  const isAppointment = service.kind === "APPOINTMENT";
+  const kind = effectiveServiceKind(service.kind, service.name);
+  const isAppointment = kind === "APPOINTMENT";
+  const isHotel = kind === "STAY";
   const startDate = isAppointment
     ? new Date(`${toDateKey(data.startDate)}T12:00:00`)
     : data.startDate;
   const endDate = isAppointment ? startDate : data.endDate;
   const slotTime = isAppointment ? data.slotTime : undefined;
+  const checkoutTime = isHotel ? data.checkoutTime : undefined;
 
   if (isAppointment && !slotTime) {
     return { ok: false as const, error: "Escolha um horário disponível." };
@@ -167,21 +187,43 @@ export async function createBooking(input: CreateBookingInput) {
 
   const slotCheck = await assertSlotAvailable({
     tenantId: tenant.id,
-    kind: service.kind,
+    serviceId: service.id,
+    kind,
     startDate,
     endDate,
     slotTime,
+    checkoutTime,
+    species: data.pet.species,
   });
   if (!slotCheck.ok) {
     return slotCheck;
   }
 
+  const daycareDays =
+    kind === "DAYCARE" ? eachDateKey(startDate, endDate).length : undefined;
+
   const pricing = calculateStayPricing(
     Number(service.price),
     startDate,
     endDate,
-    Number(tenant.depositRate),
+    {
+      checkoutTime,
+      cutoffTime: service.dailyCutoffTime,
+      depositAmount: service.depositAmount == null ? null : Number(service.depositAmount),
+      days: isAppointment ? 1 : daycareDays,
+    },
   );
+  const requiresEntrada = pricing.depositAmount > 0;
+
+  if (requiresEntrada && accessToken) {
+    if (!pixPayer) {
+      return {
+        ok: false as const,
+        error: "Informe a chave PIX: CPF, e-mail ou celular.",
+      };
+    }
+    if (!pixPayer.ok) return pixPayer;
+  }
 
   const requiredVaccines = await prisma.tenantRequiredVaccine.findMany({
     where: { tenantId: tenant.id },
@@ -250,8 +292,9 @@ export async function createBooking(input: CreateBookingInput) {
         startDate,
         endDate,
         slotTime: slotTime ?? null,
-        status: "PENDING",
-        paymentStatus: "PENDING",
+        checkoutTime: checkoutTime ?? null,
+        status: requiresEntrada ? "PENDING" : "CONFIRMED",
+        paymentStatus: requiresEntrada ? "PENDING" : "PAID",
         totalAmount: pricing.totalAmount,
         depositAmount: pricing.depositAmount,
       },
@@ -268,13 +311,13 @@ export async function createBooking(input: CreateBookingInput) {
     ticketUrl?: string;
   } | null = null;
 
-  if (accessToken) {
+  if (requiresEntrada && accessToken) {
     try {
       pix = await createPixDeposit({
         accessToken,
         bookingId: booking.id,
         amount: pricing.depositAmount,
-        description: `Sinal PetFlow · ${service.name} · ${booking.pet.name}`,
+        description: `Entrada PetFlow · ${service.name} · ${booking.pet.name}`,
         payerEmail:
           pixPayer && pixPayer.ok
             ? pixPayer.email
@@ -292,10 +335,26 @@ export async function createBooking(input: CreateBookingInput) {
     }
   }
 
+  if (!requiresEntrada) {
+    await sendBookingConfirmedWhatsApp({
+      tenant,
+      tutorName: booking.pet.tutor.name,
+      tutorPhone: booking.pet.tutor.phone,
+      petName: booking.pet.name,
+      startDate: booking.startDate,
+      endDate: booking.endDate,
+      slotTime: booking.slotTime,
+    });
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/check-in");
+    revalidatePath("/dashboard/check-out");
+  }
+
   return {
     ok: true as const,
     bookingId: booking.id,
     missingVaccines,
+    confirmed: !requiresEntrada,
     totals: {
       nights: pricing.nights,
       totalAmount: pricing.totalAmount,
@@ -327,24 +386,15 @@ export async function confirmPaidBooking(bookingId: string) {
     data: { paymentStatus: "PAID", status: "CONFIRMED" },
   });
 
-  const instanceName =
-    booking.tenant.whatsappInstanceName ?? `petflow_${booking.tenant.slug}`;
-
-  try {
-    await sendWhatsAppText({
-      instanceName,
-      phone: booking.pet.tutor.phone,
-      text: whatsappTemplates.confirmation({
-        tutorName: booking.pet.tutor.name,
-        petName: booking.pet.name,
-        startDate: booking.startDate,
-        endDate: booking.endDate,
-        slotTime: booking.slotTime,
-      }),
-    });
-  } catch (error) {
-    console.error("[confirm-booking] whatsapp", error);
-  }
+  await sendBookingConfirmedWhatsApp({
+    tenant: booking.tenant,
+    tutorName: booking.pet.tutor.name,
+    tutorPhone: booking.pet.tutor.phone,
+    petName: booking.pet.name,
+    startDate: booking.startDate,
+    endDate: booking.endDate,
+    slotTime: booking.slotTime,
+  });
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/check-in");

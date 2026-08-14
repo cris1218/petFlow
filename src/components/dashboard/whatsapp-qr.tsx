@@ -2,28 +2,17 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { QrCode } from "lucide-react";
 import {
   markWhatsAppConnected,
   pairWhatsApp,
   refreshWhatsAppQr,
 } from "@/actions/whatsapp";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { useFeedback } from "@/components/app-feedback";
 import { formatWhatsAppMask } from "@/lib/utils";
 
 export function WhatsAppQrCard({
-  connected,
   number,
-  instanceName,
 }: {
   connected: boolean;
   number: string | null;
@@ -81,77 +70,64 @@ export function WhatsAppQrCard({
       }
 
       setError(
-        "QR ainda não chegou. Clique em Gerar QR Code de novo. Se persistir, no Railway da Evolution confira SERVER_URL=https://evolution-api-production-98c1.up.railway.app",
+        "O QR ainda não apareceu. Toque em Gerar QR Code de novo.",
       );
       setStatus(null);
     });
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <CardTitle className="flex min-w-0 items-center gap-2">
-            <QrCode className="h-5 w-5 shrink-0 text-primary" />
-            Conexão WhatsApp
-          </CardTitle>
-          <Badge className="shrink-0" variant={connected ? "success" : "warning"}>
-            {connected ? "Conectado" : "Aguardando pareamento"}
-          </Badge>
-        </div>
-        <CardDescription>
-          Escaneie o QR Code da Evolution API com o WhatsApp do hotel.
-          Instância: {instanceName}
-          {number ? ` · ${formatWhatsAppMask(number)}` : ""}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="mx-auto flex aspect-square w-full max-w-xs items-center justify-center rounded-xl border bg-muted p-4">
-          {qr ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={qr.startsWith("data:") ? qr : `data:image/png;base64,${qr}`}
-              alt="QR Code WhatsApp"
-              className="h-full w-full object-contain"
-            />
-          ) : (
-            <p className="text-center text-sm text-muted-foreground">
-              {status ??
-                (mocked
-                  ? "Evolution API não configurada."
-                  : "Gere o QR Code para parear o número do estabelecimento.")}
-            </p>
-          )}
-        </div>
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-          <Button className="w-full sm:w-auto" onClick={() => loadQr(false)} loading={isPending}>
-            {isPending ? "Gerando..." : "Gerar QR Code"}
-          </Button>
-          <Button
-            className="w-full sm:w-auto"
-            variant="outline"
-            onClick={() => loadQr(true)}
-            loading={isPending}
-          >
-            Atualizar
-          </Button>
-          <Button
-            className="w-full sm:w-auto"
-            variant="secondary"
-            loading={isPending}
-            onClick={() =>
-              startTransition(async () => {
-                await markWhatsAppConnected(true);
-                success();
-                router.refresh();
-              })
-            }
-          >
-            Marcar como conectado
-          </Button>
-        </div>
-        {error && <p className="text-sm text-destructive">{error}</p>}
-      </CardContent>
-    </Card>
+    <div className="space-y-4">
+      {number ? (
+        <p className="text-sm text-muted-foreground">
+          Número ligado: {formatWhatsAppMask(number)}
+        </p>
+      ) : null}
+      <div className="mx-auto flex aspect-square w-full max-w-xs items-center justify-center rounded-xl border bg-muted p-4">
+        {qr ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={qr.startsWith("data:") ? qr : `data:image/png;base64,${qr}`}
+            alt="QR Code WhatsApp"
+            className="h-full w-full object-contain"
+          />
+        ) : (
+          <p className="text-center text-sm text-muted-foreground">
+            {status ??
+              (mocked
+                ? "O WhatsApp ainda não está pronto neste ambiente."
+                : "Toque em Gerar QR Code. Depois abra o WhatsApp do hotel e aponte a câmera.")}
+          </p>
+        )}
+      </div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+        <Button className="w-full sm:w-auto" onClick={() => loadQr(false)} loading={isPending}>
+          {isPending ? "Gerando..." : "Gerar QR Code"}
+        </Button>
+        <Button
+          className="w-full sm:w-auto"
+          variant="outline"
+          onClick={() => loadQr(true)}
+          loading={isPending}
+        >
+          Atualizar
+        </Button>
+        <Button
+          className="w-full sm:w-auto"
+          variant="secondary"
+          loading={isPending}
+          onClick={() =>
+            startTransition(async () => {
+              await markWhatsAppConnected(true);
+              success();
+              router.refresh();
+            })
+          }
+        >
+          Já conectei
+        </Button>
+      </div>
+      {error && <p className="text-sm text-destructive">{error}</p>}
+    </div>
   );
 }

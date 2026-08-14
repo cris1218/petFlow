@@ -15,7 +15,7 @@ export default async function HotelUsersPage({
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="space-y-6">
       <div>
         <Button asChild variant="outline" size="sm">
           <Link href="/admin">Voltar aos hotéis</Link>

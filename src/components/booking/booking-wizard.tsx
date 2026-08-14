@@ -40,11 +40,11 @@ import {
   type PetSize,
 } from "@/lib/constants";
 import { BookableService, calculateStayPricing } from "@/lib/pricing";
-import { formatBRL, formatBookingWhen, formatFullAddress, phoneDigits, cpfDigits, cepDigits } from "@/lib/utils";
+import { formatBRL, formatBookingWhen, formatDate, formatFullAddress, phoneDigits, cpfDigits, cepDigits } from "@/lib/utils";
 import { lookupCep } from "@/lib/cep";
 import { CpfInput } from "@/components/ui/cpf-input";
 import { CepInput } from "@/components/ui/cep-input";
-import { toDateKey } from "@/lib/schedule";
+import { SERVICE_KIND_LABELS, eachDateKey, effectiveServiceKind, toDateKey } from "@/lib/schedule";
 import { useFeedback } from "@/components/app-feedback";
 
 const STEPS = [
@@ -54,12 +54,14 @@ const STEPS = [
   "Confirmação",
 ];
 
+const FULL_CAPACITY_MESSAGE =
+  "Está com a lotação máxima nesse período. Escolha outras datas.";
+
 type WizardProps = {
   tenantName: string;
   tenantSlug: string;
   tenantLogoUrl?: string | null;
   services: BookableService[];
-  depositRate: number;
   requiredVaccines: Array<{ id: string; name: string }>;
   pixEnabled: boolean;
   petPolicy: PetPolicy;
@@ -78,7 +80,6 @@ export function BookingWizard({
   tenantSlug,
   tenantLogoUrl,
   services,
-  depositRate,
   requiredVaccines,
   pixEnabled,
   petPolicy,
@@ -88,10 +89,17 @@ export function BookingWizard({
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [slotTime, setSlotTime] = useState("");
+  const [checkoutTime, setCheckoutTime] = useState("12:00");
   const [stayInfo, setStayInfo] = useState<{
     remaining: number;
     capacity: number;
     available: boolean;
+    closedDays?: string[];
+    catRemaining?: number;
+    dogRemaining?: number;
+    catCapacity?: number;
+    dogCapacity?: number;
+    extraNight?: boolean;
   } | null>(null);
   const [slots, setSlots] = useState<Array<{ time: string; available: boolean }>>(
     [],
@@ -138,8 +146,34 @@ export function BookingWizard({
   const { success } = useFeedback();
 
   const selectedService = services.find((service) => service.id === serviceId) ?? services[0];
-  const isAppointment = selectedService?.kind === "APPOINTMENT";
+  const selectedKind = selectedService
+    ? effectiveServiceKind(selectedService.kind, selectedService.name)
+    : "STAY";
+  const isAppointment = selectedKind === "APPOINTMENT";
+  const isHotel = selectedKind === "STAY";
+  const isDaycare = selectedKind === "DAYCARE";
   const todayKey = toDateKey(new Date());
+  const cutoffTime = selectedService?.dailyCutoffTime || "12:00";
+  const needsEntrada = Number(selectedService?.depositAmount ?? 0) > 0;
+  const speciesAtCapacity = Boolean(
+    stayInfo &&
+      (isDaycare
+        ? !stayInfo.available
+        : pet.species === "CAT"
+          ? (stayInfo.catRemaining ?? 0) <= 0
+          : (stayInfo.dogRemaining ?? 0) <= 0),
+  );
+  const periodAtCapacity = Boolean(
+    stayInfo &&
+      (isDaycare
+        ? !stayInfo.available
+        : (allowedSpecies(petPolicy).includes("CAT")
+            ? (stayInfo.catRemaining ?? 0) <= 0
+            : true) &&
+          (allowedSpecies(petPolicy).some((species) => species !== "CAT")
+            ? (stayInfo.dogRemaining ?? 0) <= 0
+            : true)),
+  );
 
   const pricing = useMemo(() => {
     if (!startDate || !selectedService) return null;
@@ -150,8 +184,26 @@ export function BookingWizard({
     if (Number.isNaN(start.getTime()) || Number.isNaN(finish.getTime()) || finish < start) {
       return null;
     }
-    return calculateStayPricing(selectedService.price, start, finish, depositRate);
-  }, [selectedService, startDate, endDate, depositRate, isAppointment]);
+    return calculateStayPricing(selectedService.price, start, finish, {
+      checkoutTime: isHotel ? checkoutTime : undefined,
+      cutoffTime,
+      depositAmount: selectedService.depositAmount,
+      days: isAppointment
+        ? 1
+        : isDaycare
+          ? eachDateKey(start, finish).length
+          : undefined,
+    });
+  }, [
+    selectedService,
+    startDate,
+    endDate,
+    isAppointment,
+    isHotel,
+    isDaycare,
+    checkoutTime,
+    cutoffTime,
+  ]);
 
   useEffect(() => {
     const digits = cepDigits(address.cep);
@@ -190,6 +242,7 @@ export function BookingWizard({
     setStayInfo(null);
     setSlots([]);
     setSlotsClosed(false);
+    setCheckoutTime(selectedService?.dailyCutoffTime || "12:00");
     if (isAppointment && startDate && !endDate) {
       setEndDate(startDate);
     }
@@ -204,7 +257,11 @@ export function BookingWizard({
     setEndDate(startDate);
     let cancelled = false;
     setCheckingAgenda(true);
-    getPublicAppointmentSlots({ tenantSlug, date: startDate }).then((result) => {
+    getPublicAppointmentSlots({
+      tenantSlug,
+      serviceId: selectedService?.id ?? serviceId,
+      date: startDate,
+    }).then((result) => {
       if (cancelled) return;
       setCheckingAgenda(false);
       if (!result.ok) {
@@ -224,7 +281,7 @@ export function BookingWizard({
     return () => {
       cancelled = true;
     };
-  }, [isAppointment, startDate, tenantSlug]);
+  }, [isAppointment, startDate, tenantSlug, selectedService?.id, serviceId]);
 
   useEffect(() => {
     if (isAppointment || !startDate || !endDate) {
@@ -233,7 +290,14 @@ export function BookingWizard({
     }
     let cancelled = false;
     setCheckingAgenda(true);
-    getPublicStayAvailability({ tenantSlug, startDate, endDate }).then((result) => {
+    getPublicStayAvailability({
+      tenantSlug,
+      serviceId: selectedService?.id ?? serviceId,
+      startDate,
+      endDate,
+      checkoutTime: isHotel ? checkoutTime : undefined,
+      species: pet.species,
+    }).then((result) => {
       if (cancelled) return;
       setCheckingAgenda(false);
       if (!result.ok) {
@@ -245,12 +309,28 @@ export function BookingWizard({
         remaining: result.remaining,
         capacity: result.capacity,
         available: result.available,
+        closedDays: result.closedDays,
+        catRemaining: result.catRemaining,
+        dogRemaining: result.dogRemaining,
+        catCapacity: result.catCapacity,
+        dogCapacity: result.dogCapacity,
+        extraNight: result.extraNight,
       });
     });
     return () => {
       cancelled = true;
     };
-  }, [isAppointment, startDate, endDate, tenantSlug]);
+  }, [
+    isAppointment,
+    isHotel,
+    startDate,
+    endDate,
+    tenantSlug,
+    selectedService?.id,
+    serviceId,
+    checkoutTime,
+    pet.species,
+  ]);
 
   useEffect(() => {
     if (step !== 3 || !bookingId || confirmed) return;
@@ -279,11 +359,11 @@ export function BookingWizard({
       }
     } else {
       if (!startDate || !endDate) {
-        setError("Escolha as datas da estadia.");
+        setError(isDaycare ? "Escolha os dias de atendimento." : "Escolha as datas da hospedagem.");
         return;
       }
-      if (stayInfo && !stayInfo.available) {
-        setError("Não há vaga nesse período. Escolha outras datas.");
+      if (stayInfo && periodAtCapacity) {
+        setError(FULL_CAPACITY_MESSAGE);
         return;
       }
     }
@@ -305,7 +385,7 @@ export function BookingWizard({
       setError("Preencha os dados do tutor e do pet.");
       return;
     }
-    if (pixEnabled) {
+    if (pixEnabled && needsEntrada) {
       if (pixKind === "CPF" && cpfDigits(pixKey || tutor.cpf).length !== 11) {
         setError("Informe um CPF válido para o PIX.");
         return;
@@ -318,6 +398,10 @@ export function BookingWizard({
         setError("Informe um celular válido para o PIX.");
         return;
       }
+    }
+    if (!isAppointment && stayInfo && speciesAtCapacity) {
+      setError(FULL_CAPACITY_MESSAGE);
+      return;
     }
     if (
       hasPetCareProfile(pet.species) &&
@@ -343,12 +427,13 @@ export function BookingWizard({
         startDate: `${startDate}T12:00:00`,
         endDate: `${isAppointment ? startDate : endDate}T12:00:00`,
         slotTime: isAppointment ? slotTime : undefined,
+        checkoutTime: isHotel ? checkoutTime : undefined,
         tutor: {
           name: tutor.name,
           phone: tutor.phone,
           cpf: tutor.cpf,
           address: formatFullAddress(address),
-          pix: pixEnabled
+          pix: pixEnabled && needsEntrada
             ? {
                 kind: pixKind,
                 key:
@@ -364,7 +449,7 @@ export function BookingWizard({
           name: pet.name,
           species: pet.species,
           breed: pet.breed,
-          size: pet.species === "CAT" ? "SMALL" : pet.size,
+          size: pet.size,
           notes: pet.notes,
           castrated: hasPetCareProfile(pet.species) ? Boolean(pet.castrated) : undefined,
           vaccinated: hasPetCareProfile(pet.species) ? Boolean(pet.vaccinated) : undefined,
@@ -381,6 +466,12 @@ export function BookingWizard({
       setBookingId(result.bookingId);
       setPix(result.pix);
       setMissingVaccines(result.missingVaccines);
+      if (result.confirmed) {
+        setConfirmed(true);
+        setStep(4);
+        success("Reserva confirmada com sucesso.");
+        return;
+      }
       setStep(3);
       success("Reserva enviada com sucesso.");
     });
@@ -428,12 +519,14 @@ export function BookingWizard({
                     <p className="font-semibold">{service.name}</p>
                     <p className="text-sm text-muted-foreground">
                       {formatBRL(service.price)}
-                      {service.kind === "APPOINTMENT" ? " / atendimento" : " / diária"}
+                      {service.kind === "APPOINTMENT"
+                        ? " / atendimento"
+                        : service.kind === "DAYCARE"
+                          ? " / dia"
+                          : " / diária"}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {service.kind === "APPOINTMENT"
-                        ? "Agenda por horário"
-                        : "Agenda por vaga"}
+                      {SERVICE_KIND_LABELS[service.kind]}
                     </p>
                   </button>
                 ))}
@@ -495,9 +588,51 @@ export function BookingWizard({
                   </p>
                 ) : null}
               </div>
+            ) : isDaycare ? (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Dias de atendimento</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Só os dias em que o pet vai ser atendido. Não tem entrada, saída nem
+                    horário de saída.
+                  </p>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="start">De</Label>
+                    <Input
+                      id="start"
+                      type="date"
+                      min={todayKey}
+                      value={startDate}
+                      onChange={(event) => setStartDate(event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="end">Até</Label>
+                    <Input
+                      id="end"
+                      type="date"
+                      min={startDate || todayKey}
+                      value={endDate}
+                      onChange={(event) => setEndDate(event.target.value)}
+                    />
+                  </div>
+                </div>
+                {checkingAgenda && startDate && endDate ? (
+                  <p className="text-sm text-muted-foreground">Consultando vagas...</p>
+                ) : null}
+                {stayInfo?.closedDays?.length ? (
+                  <p className="text-sm text-destructive">
+                    Não atende em um dos dias escolhidos.
+                  </p>
+                ) : periodAtCapacity ? (
+                  <p className="text-sm text-destructive">{FULL_CAPACITY_MESSAGE}</p>
+                ) : null}
+              </div>
             ) : (
               <div className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-4 sm:grid-cols-3">
                   <div className="space-y-2">
                     <Label htmlFor="start">Entrada</Label>
                     <Input
@@ -518,19 +653,27 @@ export function BookingWizard({
                       onChange={(event) => setEndDate(event.target.value)}
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="checkout-time">Horário de saída</Label>
+                    <Input
+                      id="checkout-time"
+                      type="time"
+                      value={checkoutTime}
+                      onChange={(event) => setCheckoutTime(event.target.value)}
+                    />
+                  </div>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  A diária vence às {cutoffTime}. Depois disso, conta o dia seguinte.
+                </p>
                 {checkingAgenda && startDate && endDate ? (
                   <p className="text-sm text-muted-foreground">Consultando vagas...</p>
                 ) : null}
-                {stayInfo ? (
-                  <p
-                    className={`text-sm ${
-                      stayInfo.available ? "text-muted-foreground" : "text-destructive"
-                    }`}
-                  >
-                    {stayInfo.available
-                      ? `${stayInfo.remaining} vaga${stayInfo.remaining === 1 ? "" : "s"} neste período (${stayInfo.capacity} no total).`
-                      : "Não há vaga neste período. Escolha outras datas."}
+                {periodAtCapacity ? (
+                  <p className="text-sm text-destructive">{FULL_CAPACITY_MESSAGE}</p>
+                ) : stayInfo?.extraNight ? (
+                  <p className="text-sm text-muted-foreground">
+                    Saída depois do vencimento da diária (+1 diária).
                   </p>
                 ) : null}
               </div>
@@ -538,8 +681,13 @@ export function BookingWizard({
             {pricing && (
               <p className="text-sm text-muted-foreground">
                 {isAppointment
-                  ? `1 atendimento · Total ${formatBRL(pricing.totalAmount)} · Sinal ${formatBRL(pricing.depositAmount)}`
-                  : `${pricing.nights} diária(s) · Total ${formatBRL(pricing.totalAmount)} · Sinal ${formatBRL(pricing.depositAmount)}`}
+                  ? `1 atendimento · Total ${formatBRL(pricing.totalAmount)}`
+                  : isDaycare
+                    ? `${pricing.nights} dia(s) · Total ${formatBRL(pricing.totalAmount)}`
+                    : `${pricing.nights} diária(s) · Total ${formatBRL(pricing.totalAmount)}`}
+                {pricing.depositAmount > 0
+                  ? ` · Entrada ${formatBRL(pricing.depositAmount)}`
+                  : ""}
               </p>
             )}
             <Button
@@ -547,7 +695,7 @@ export function BookingWizard({
               onClick={goStep2}
               disabled={
                 services.length === 0 ||
-                (isAppointment ? !slotTime : Boolean(stayInfo && !stayInfo.available))
+                (isAppointment ? !slotTime : Boolean(stayInfo && periodAtCapacity))
               }
             >
               Continuar
@@ -636,13 +784,13 @@ export function BookingWizard({
                 placeholder="SP"
               />
             </div>
-            {pixEnabled ? (
+            {pixEnabled && needsEntrada ? (
               <div className="space-y-3 rounded-xl border p-4">
                 <div>
                   <Label>Chave PIX</Label>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Pode ser CPF, e-mail ou celular. Usamos para gerar o PIX do
-                    sinal.
+                    Pode ser CPF, e-mail ou celular. Usamos para gerar o PIX da
+                    entrada.
                   </p>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
@@ -736,36 +884,30 @@ export function BookingWizard({
                     ))}
                   </SelectContent>
                 </Select>
+                {speciesAtCapacity ? (
+                  <p className="text-sm text-destructive">{FULL_CAPACITY_MESSAGE}</p>
+                ) : null}
               </div>
-              {pet.species === "CAT" ? (
-                <div className="space-y-2">
-                  <Label>Porte</Label>
-                  <p className="flex h-11 items-center rounded-md border bg-muted px-3 text-sm">
-                    Pequeno
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <Label>Porte</Label>
-                  <Select
-                    value={pet.size}
-                    onValueChange={(value) =>
-                      setPet({ ...pet, size: value as typeof pet.size })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Porte" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {sizesForSpecies(pet.species, petPolicy).map((value) => (
-                        <SelectItem key={value} value={value}>
-                          {SIZE_LABELS[value]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+              <div className="space-y-2">
+                <Label>Porte</Label>
+                <Select
+                  value={pet.size}
+                  onValueChange={(value) =>
+                    setPet({ ...pet, size: value as typeof pet.size })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Porte" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sizesForSpecies(pet.species, petPolicy).map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {SIZE_LABELS[value]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             {hasPetCareProfile(pet.species) ? (
               <div className="space-y-3 rounded-xl border p-3">
@@ -822,8 +964,8 @@ export function BookingWizard({
               <Button className="w-full sm:w-auto" onClick={submitBooking} loading={isPending}>
                 {isPending
                   ? "Enviando..."
-                  : pixEnabled
-                    ? "Gerar PIX do sinal"
+                  : pixEnabled && needsEntrada
+                    ? "Gerar PIX da entrada"
                     : "Enviar reserva"}
               </Button>
             </div>
@@ -835,7 +977,7 @@ export function BookingWizard({
             {pix ? (
               <>
                 <p className="text-sm text-muted-foreground">
-                  Pague o sinal de {formatBRL(pricing.depositAmount)} via PIX. A
+                  Pague a entrada de {formatBRL(pricing.depositAmount)} via PIX. A
                   reserva confirma automaticamente após o pagamento.
                 </p>
                 {pix.qrCodeBase64 ? (
@@ -863,7 +1005,7 @@ export function BookingWizard({
               </>
             ) : (
               <p className="text-sm text-muted-foreground">
-                Reserva enviada. Pague o sinal de{" "}
+                Reserva enviada. Pague a entrada de{" "}
                 {formatBRL(pricing.depositAmount)} no hotel. Assim que o
                 estabelecimento confirmar, esta página atualiza sozinha.
               </p>
@@ -883,8 +1025,17 @@ export function BookingWizard({
             </div>
             <h3 className="text-xl font-semibold">Reserva confirmada</h3>
             <p className="text-sm text-muted-foreground">
-              {pet.name} está agendado {formatBookingWhen(startDate, isAppointment ? startDate : endDate, isAppointment ? slotTime : null)}.
-              A confirmação foi enviada no WhatsApp de {tutor.name}.
+              {pet.name} está agendado{" "}
+              {isDaycare
+                ? startDate === endDate
+                  ? formatDate(startDate)
+                  : `${formatDate(startDate)} a ${formatDate(endDate)}`
+                : formatBookingWhen(
+                    startDate,
+                    isAppointment ? startDate : endDate,
+                    isAppointment ? slotTime : null,
+                  )}
+              . A confirmação foi enviada no WhatsApp de {tutor.name}.
             </p>
           </div>
         )}

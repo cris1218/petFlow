@@ -150,7 +150,7 @@ export function AppShell({
         {logout}
       </aside>
 
-      <main className="min-w-0 flex-1 bg-muted/30 px-4 py-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-6 lg:p-8">
+      <main className="min-w-0 flex-1 bg-muted/30 px-5 py-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
         {children}
       </main>
     </div>

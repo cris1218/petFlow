@@ -1,36 +1,30 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { CreditCard, Save, Upload } from "lucide-react";
+import { Save, Upload } from "lucide-react";
 import {
   removeHotelLogo,
   removeMercadoPagoToken,
-  saveDepositRate,
   saveHotelWhatsApp,
   saveMercadoPagoToken,
   uploadHotelLogoAction,
 } from "@/actions/settings";
 import { HotelServicesForm, type HotelServiceItem } from "@/components/dashboard/hotel-services-form";
 import { HotelScheduleForm, type HotelScheduleValues } from "@/components/dashboard/schedule-form";
+import { SettingsSection } from "@/components/dashboard/settings-section";
+import { WhatsAppQrCard } from "@/components/dashboard/whatsapp-qr";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { formatBRL } from "@/lib/utils";
 import { WhatsAppInput } from "@/components/ui/whatsapp-input";
 import { useFeedback } from "@/components/app-feedback";
 import { MercadoPagoSetupGuide } from "@/components/mercadopago-setup-guide";
 import { BrandMark } from "@/components/brand-mark";
-import { WhatsAppQrCard } from "@/components/dashboard/whatsapp-qr";
-import { LOGO_UPLOAD_HINT } from "@/lib/constants";
+import { AccountForm } from "@/components/account-form";
+import { CreateStaffForm } from "@/components/dashboard/staff-form";
+import { StaffList } from "@/components/dashboard/staff-list";
 
 export type SettingsFormValues = {
   name: string;
@@ -47,6 +41,8 @@ export type SettingsFormValues = {
 export function SettingsForm({
   initial,
   whatsapp,
+  staff,
+  accountEmail,
 }: {
   initial: SettingsFormValues;
   whatsapp: {
@@ -54,27 +50,24 @@ export function SettingsForm({
     number: string | null;
     instanceName: string;
   };
+  staff: Array<{ id: string; name: string; email: string }>;
+  accountEmail: string;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [whatsappNumber, setWhatsappNumber] = useState(initial.whatsappNumber);
-  const [depositRate, setDepositRate] = useState(
-    String(Math.round(initial.depositRate * 100)),
-  );
   const [mpAccessToken, setMpAccessToken] = useState("");
   const [pixConfigured, setPixConfigured] = useState(initial.pixConfigured);
   const [logoUrl, setLogoUrl] = useState(initial.logoUrl);
   const [hotelError, setHotelError] = useState<string | null>(null);
-  const [depositError, setDepositError] = useState<string | null>(null);
   const [mpError, setMpError] = useState<string | null>(null);
   const [savingHotel, startHotel] = useTransition();
-  const [savingDeposit, startDeposit] = useTransition();
   const [savingMp, startMp] = useTransition();
   const { success, error: toastError } = useFeedback();
 
   function onLogoChange(file?: File) {
     if (!file) return;
     if (file.size > 2 * 1024 * 1024) {
-      const message = "O logo deve ter no máximo 2 MB.";
+      const message = "A foto deve ter no máximo 2 MB.";
       setHotelError(message);
       toastError(message);
       return;
@@ -117,19 +110,6 @@ export function SettingsForm({
     });
   }
 
-  function saveDeposit() {
-    startDeposit(async () => {
-      setDepositError(null);
-      const result = await saveDepositRate(Number(depositRate) / 100);
-      if (!result.ok) {
-        setDepositError(result.error);
-        toastError(result.error);
-        return;
-      }
-      success("Sinal salvo.");
-    });
-  }
-
   function saveMp() {
     startMp(async () => {
       setMpError(null);
@@ -154,21 +134,18 @@ export function SettingsForm({
     });
   }
 
-  const examplePrice =
-    initial.services.find((service) => service.active)?.price || 0;
-
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Estabelecimento</CardTitle>
-          <CardDescription>
-            {initial.name} · portal público /agendar/{initial.slug}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+    <div className="space-y-3">
+      <SettingsSection
+        title="Seu hotel"
+        description="Aqui fica a cara do hotel: a foto que o cliente vê na hora de agendar e o WhatsApp para receber recado."
+      >
+        <div className="space-y-4">
           <div className="space-y-2">
-            <Label>Logo na agenda</Label>
+            <Label>Foto do hotel</Label>
+            <p className="text-xs text-muted-foreground">
+              Use uma imagem quadrada, de preferência PNG sem fundo. Máximo 2 MB.
+            </p>
             <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-start">
               <div className="flex h-28 w-full max-w-[16rem] items-center justify-center overflow-hidden rounded-xl border bg-muted p-3">
                 <BrandMark logoUrl={logoUrl} name={initial.name} size="lg" />
@@ -190,7 +167,7 @@ export function SettingsForm({
                     onClick={() => fileRef.current?.click()}
                   >
                     <Upload className="h-4 w-4" />
-                    {savingHotel ? "Enviando..." : logoUrl ? "Trocar logo" : "Enviar logo"}
+                    {savingHotel ? "Enviando..." : logoUrl ? "Trocar foto" : "Enviar foto"}
                   </Button>
                   {logoUrl && (
                     <Button
@@ -204,14 +181,14 @@ export function SettingsForm({
                     </Button>
                   )}
                 </div>
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                  {LOGO_UPLOAD_HINT}
-                </p>
               </div>
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="whatsapp">WhatsApp do hotel</Label>
+            <Label htmlFor="whatsapp">Número do WhatsApp</Label>
+            <p className="text-xs text-muted-foreground">
+              É o telefone do hotel. Serve para o cliente saber com quem está falando.
+            </p>
             <WhatsAppInput
               id="whatsapp"
               value={whatsappNumber}
@@ -221,77 +198,60 @@ export function SettingsForm({
           {hotelError && <p className="text-sm text-destructive">{hotelError}</p>}
           <Button type="button" className="w-full sm:w-auto" loading={savingHotel} onClick={saveWhatsApp}>
             <Save className="h-4 w-4" />
-            Salvar estabelecimento
+            Salvar
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </SettingsSection>
 
-      <WhatsAppQrCard
-        connected={whatsapp.connected}
-        number={whatsapp.number}
-        instanceName={whatsapp.instanceName}
-      />
+      <SettingsSection
+        title="WhatsApp"
+        description="Ligue o WhatsApp do hotel no sistema. Assim o tutor recebe a confirmação da reserva e as fotos do diário no celular."
+        extra={
+          <Badge variant={whatsapp.connected ? "success" : "warning"}>
+            {whatsapp.connected ? "Ligado" : "Desligado"}
+          </Badge>
+        }
+      >
+        <WhatsAppQrCard
+          connected={whatsapp.connected}
+          number={whatsapp.number}
+          instanceName={whatsapp.instanceName}
+        />
+      </SettingsSection>
 
-      <HotelScheduleForm initial={initial.schedule} />
+      <SettingsSection
+        title="Quem vocês aceitam"
+        description="Marque o tamanho dos gatos e dos cães que o hotel recebe. Na hora de agendar, o cliente só vê o que estiver marcado."
+      >
+        <HotelScheduleForm initial={initial.schedule} />
+      </SettingsSection>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Serviços e sinal</CardTitle>
-          <CardDescription>
-            Cadastre hotel, diária, banho e tosa, petsitter e o que mais o
-            estabelecimento oferecer. Em cada serviço, escolha se a agenda é
-            por vaga (estadia) ou por horário. O sinal é o percentual do PIX.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <HotelServicesForm initial={initial.services} />
-          <div className="max-w-full space-y-2 sm:max-w-xs">
-            <Label htmlFor="deposit">Sinal (%)</Label>
-            <Input
-              id="deposit"
-              type="number"
-              min="1"
-              max="100"
-              value={depositRate}
-              onChange={(event) => setDepositRate(event.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              Ex.: {depositRate || 0}% de {formatBRL(examplePrice)} ={" "}
-              {formatBRL((examplePrice * (Number(depositRate) || 0)) / 100)}
-            </p>
-          </div>
-          {depositError && (
-            <p className="text-sm text-destructive">{depositError}</p>
-          )}
-          <Button type="button" className="w-full sm:w-auto" loading={savingDeposit} onClick={saveDeposit}>
-            <Save className="h-4 w-4" />
-            Salvar sinal
-          </Button>
-        </CardContent>
-      </Card>
+      <SettingsSection
+        title="Serviços e preços"
+        description="Cadastre o que o hotel oferece. Hotel é pernoite, com entrada e saída. Creche e petsitter são só os dias de atendimento, sem horário de saída. Banho e tosa é hora marcada."
+      >
+        <HotelServicesForm initial={initial.services} />
+      </SettingsSection>
 
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <CardTitle className="flex min-w-0 items-center gap-2">
-              <CreditCard className="h-5 w-5 shrink-0 text-primary" />
-              Mercado Pago
-            </CardTitle>
-            <Badge className="shrink-0" variant={pixConfigured ? "success" : "warning"}>
-              {pixConfigured ? "PIX ativo" : "PIX não configurado"}
-            </Badge>
-          </div>
-          <CardDescription>
-            Token da conta do hotel para o PIX do sinal nas reservas.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <SettingsSection
+        title="PIX para receber"
+        description="É assim que o tutor paga a reserva. O dinheiro cai na conta Mercado Pago do hotel. Cole o código da sua conta e salve."
+        extra={
+          <Badge variant={pixConfigured ? "success" : "warning"}>
+            {pixConfigured ? "PIX pronto" : "Falta configurar"}
+          </Badge>
+        }
+      >
+        <div className="space-y-4">
           <MercadoPagoSetupGuide
             webhookUrl={initial.webhookUrl}
             audience="hotel"
           />
           <div className="space-y-2">
-            <Label htmlFor="mp">Access Token</Label>
+            <Label htmlFor="mp">Código da conta (Access Token)</Label>
+            <p className="text-xs text-muted-foreground">
+              É a chave que o Mercado Pago gera para o hotel receber o PIX. Começa com APP_USR-.
+            </p>
             <PasswordInput
               id="mp"
               autoComplete="off"
@@ -299,7 +259,7 @@ export function SettingsForm({
               onChange={(event) => setMpAccessToken(event.target.value)}
               placeholder={
                 pixConfigured
-                  ? "Deixe em branco para manter o token atual"
+                  ? "Deixe em branco para manter o código atual"
                   : "APP_USR-..."
               }
             />
@@ -314,7 +274,7 @@ export function SettingsForm({
               onClick={saveMp}
             >
               <Save className="h-4 w-4" />
-              Salvar Mercado Pago
+              Salvar PIX
             </Button>
             {pixConfigured && (
               <Button
@@ -324,12 +284,35 @@ export function SettingsForm({
                 loading={savingMp}
                 onClick={removeToken}
               >
-                Remover token
+                Remover código
               </Button>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </SettingsSection>
+
+      <SettingsSection
+        title="Equipe"
+        description="Quem trabalha no hotel. Elas veem reservas, entrada e o diário. Cada pessoa extra entra no plano (R$ 9,90). O primeiro gestor já está incluso."
+      >
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Nova pessoa</p>
+            <CreateStaffForm />
+          </div>
+          <div className="space-y-3">
+            <p className="text-sm font-medium">Quem já está na equipe</p>
+            <StaffList users={staff} />
+          </div>
+        </div>
+      </SettingsSection>
+
+      <SettingsSection
+        title="Minha conta"
+        description="Seu login. Troque o e-mail ou a senha quando quiser."
+      >
+        <AccountForm email={accountEmail} />
+      </SettingsSection>
     </div>
   );
 }

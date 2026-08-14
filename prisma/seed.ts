@@ -12,12 +12,12 @@ const prisma = new PrismaClient() as PrismaClient & {
         price: number;
         sortOrder: number;
         active: boolean;
-        kind: "STAY" | "APPOINTMENT";
+        kind: "STAY" | "DAYCARE" | "APPOINTMENT";
       }>;
     }) => Promise<unknown>;
     updateMany: (args: {
       where: { tenantId: string; name: string };
-      data: { kind: "STAY" | "APPOINTMENT" };
+      data: { kind: "STAY" | "DAYCARE" | "APPOINTMENT" };
     }) => Promise<unknown>;
   };
   tenantWeekday: {
@@ -67,7 +67,7 @@ async function main() {
     await prisma.tenantService.createMany({
       data: [
         { tenantId: tenant.id, name: "Hotel", price: 80, sortOrder: 0, active: true, kind: "STAY" },
-        { tenantId: tenant.id, name: "Creche / diária", price: 50, sortOrder: 1, active: true, kind: "STAY" },
+        { tenantId: tenant.id, name: "Creche", price: 50, sortOrder: 1, active: true, kind: "DAYCARE" },
         { tenantId: tenant.id, name: "Banho e tosa", price: 70, sortOrder: 2, active: true, kind: "APPOINTMENT" },
       ],
     });
@@ -75,6 +75,14 @@ async function main() {
     await prisma.tenantService.updateMany({
       where: { tenantId: tenant.id, name: "Banho e tosa" },
       data: { kind: "APPOINTMENT" },
+    });
+    await prisma.tenantService.updateMany({
+      where: { tenantId: tenant.id, name: "Creche / diária" },
+      data: { kind: "DAYCARE" },
+    });
+    await prisma.tenantService.updateMany({
+      where: { tenantId: tenant.id, name: "Creche" },
+      data: { kind: "DAYCARE" },
     });
   }
 

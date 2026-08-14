@@ -5,7 +5,7 @@ export default async function PlanPage() {
   const overview = await getHotelBillingOverview();
 
   return (
-    <div className="mx-auto max-w-xl space-y-6">
+    <div className="space-y-6">
       <div>
         <h1 className="text-xl font-semibold sm:text-2xl">Plano</h1>
         <p className="text-sm text-muted-foreground">

@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { getTenantBySlug } from "@/lib/tenant";
 import { BookingWizard } from "@/components/booking/booking-wizard";
 import { BrandMark } from "@/components/brand-mark";
-import { dogSizesFromFlags } from "@/lib/constants";
+import { petPolicyFromTenant } from "@/lib/constants";
 import { isMercadoPagoConfigured } from "@/lib/mercadopago";
 import { ensureTenantServices, serializeTenantService } from "@/lib/services";
 import { ensureTenantSchedule } from "@/lib/tenant-schedule";
@@ -25,6 +25,7 @@ export default async function PublicBookingPage({
   await ensureTenantSchedule(tenant.id);
   const services = await prisma.tenantService.findMany({
     where: { tenantId: tenant.id, active: true },
+    include: { weekdays: true },
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
   });
   const pixEnabled = isMercadoPagoConfigured(tenant);
@@ -48,7 +49,7 @@ export default async function PublicBookingPage({
         <h1 className="mt-1 text-2xl font-semibold sm:text-3xl">{tenant.name}</h1>
         <p className="text-muted-foreground">
           {offerText}
-          {pixEnabled ? " e pague o sinal via PIX." : "."} A confirmação chega no
+          {pixEnabled ? " Se houver entrada, pague via PIX." : "."} A confirmação chega no
           WhatsApp.
         </p>
       </div>
@@ -57,13 +58,9 @@ export default async function PublicBookingPage({
         tenantSlug={tenant.slug}
         tenantLogoUrl={tenant.logoUrl}
         services={services.map(serializeTenantService)}
-        depositRate={Number(tenant.depositRate)}
         requiredVaccines={[]}
         pixEnabled={pixEnabled}
-        petPolicy={{
-          acceptsCats: tenant.acceptsCats,
-          dogSizes: dogSizesFromFlags(tenant),
-        }}
+        petPolicy={petPolicyFromTenant(tenant)}
       />
     </div>
   );

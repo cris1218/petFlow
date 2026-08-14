@@ -65,8 +65,10 @@ export function PendingBookings({ bookings }: { bookings: PendingBooking[] }) {
                 </p>
               ) : null}
               <p className="text-xs text-muted-foreground">
-                {formatBookingWhen(booking.startDate, booking.endDate, booking.slotTime)} ·
-                sinal {formatBRL(booking.depositAmount)}
+                {formatBookingWhen(booking.startDate, booking.endDate, booking.slotTime)}
+                {booking.depositAmount > 0
+                  ? ` · entrada ${formatBRL(booking.depositAmount)}`
+                  : ""}
               </p>
             </div>
             <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:items-end">

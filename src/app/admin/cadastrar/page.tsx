@@ -6,7 +6,7 @@ export default function AdminCadastrarPage({
   searchParams: { name?: string; email?: string };
 }) {
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="space-y-6">
       <div>
         <h1 className="text-xl font-semibold sm:text-2xl">Cadastrar</h1>
         <p className="text-sm text-muted-foreground">

@@ -5,7 +5,7 @@ export default async function DashboardAccountPage() {
   const profile = await getAccountProfile();
 
   return (
-    <div className="mx-auto max-w-xl space-y-6">
+    <div className="space-y-6">
       <div>
         <h1 className="text-xl font-semibold sm:text-2xl">Minha conta</h1>
         <p className="text-sm text-muted-foreground">

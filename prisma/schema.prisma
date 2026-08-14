@@ -65,6 +65,7 @@ enum SupportTicketStatus {
 
 enum ServiceKind {
   STAY
+  DAYCARE
   APPOINTMENT
 }
 
@@ -89,6 +90,9 @@ model Tenant {
   appointmentCapacity  Int          @default(1)
   slotDurationMin      Int          @default(60)
   acceptsCats          Boolean      @default(true)
+  acceptsCatSmall      Boolean      @default(true)
+  acceptsCatMedium     Boolean      @default(true)
+  acceptsCatLarge      Boolean      @default(true)
   acceptsDogSmall      Boolean      @default(true)
   acceptsDogMedium     Boolean      @default(true)
   acceptsDogLarge      Boolean      @default(true)
@@ -139,20 +143,42 @@ model TenantRequiredVaccine {
 }
 
 model TenantService {
-  id        String      @id @default(cuid())
-  tenantId  String
-  name      String
-  price     Decimal     @db.Decimal(10, 2)
-  kind      ServiceKind @default(STAY)
-  active    Boolean     @default(true)
-  sortOrder Int         @default(0)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  id            String      @id @default(cuid())
+  tenantId      String
+  name          String
+  price         Decimal     @db.Decimal(10, 2)
+  kind          ServiceKind @default(STAY)
+  active        Boolean     @default(true)
+  sortOrder     Int         @default(0)
+  dailyCutoffTime String    @default("12:00")
+  depositAmount Decimal?    @db.Decimal(10, 2)
+  catCapacity   Int         @default(10)
+  dogCapacity   Int         @default(10)
+  periodCapacity Int        @default(10)
+  slotDurationMin Int       @default(30)
+  slotCapacity  Int         @default(1)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
-  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   bookings Booking[]
+  weekdays TenantServiceWeekday[]
 
   @@index([tenantId, active])
+}
+
+model TenantServiceWeekday {
+  id        String  @id @default(cuid())
+  serviceId String
+  weekday   Int
+  openTime  String  @default("08:00")
+  closeTime String  @default("18:00")
+  closed    Boolean @default(false)
+
+  service TenantService @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([serviceId, weekday])
+  @@index([serviceId])
 }
 
 model TenantWeekday {
@@ -318,6 +344,7 @@ model Booking {
   startDate     DateTime
   endDate       DateTime
   slotTime      String?
+  checkoutTime  String?
   status        BookingStatus  @default(PENDING)
   totalAmount   Decimal        @db.Decimal(10, 2)
   depositAmount Decimal        @db.Decimal(10, 2)

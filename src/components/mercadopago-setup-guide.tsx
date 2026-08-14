@@ -16,7 +16,7 @@ export function MercadoPagoSetupGuide({
   const { success } = useFeedback();
   const who =
     audience === "hotel"
-      ? "a conta Mercado Pago do hotel (é ela que recebe o sinal das reservas)"
+      ? "a conta Mercado Pago do hotel, que é onde cai o pagamento da reserva"
       : "a conta Mercado Pago da plataforma (é ela que recebe o PIX dos planos)";
 
   async function copyWebhook() {
@@ -27,9 +27,9 @@ export function MercadoPagoSetupGuide({
   return (
     <div className="space-y-4 rounded-xl border bg-muted/40 p-4">
       <div>
-        <p className="text-sm font-medium">Como configurar o PIX</p>
+        <p className="text-sm font-medium">Como ligar o PIX</p>
         <p className="mt-1 text-xs text-muted-foreground">
-          Use {who}. O token de teste (TEST-) não recebe PIX real.
+          Use {who}. O código de teste (TEST-) não recebe dinheiro de verdade.
         </p>
       </div>
       <ol className="space-y-3">

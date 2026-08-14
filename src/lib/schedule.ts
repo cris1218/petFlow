@@ -1,10 +1,19 @@
-export const SERVICE_KINDS = ["STAY", "APPOINTMENT"] as const;
+export const SERVICE_KINDS = ["STAY", "DAYCARE", "APPOINTMENT"] as const;
 export type ServiceKind = (typeof SERVICE_KINDS)[number];
 
 export const SERVICE_KIND_LABELS: Record<ServiceKind, string> = {
-  STAY: "Estadia (hotel / creche)",
-  APPOINTMENT: "Horário (banho e tosa)",
+  STAY: "Hotel",
+  DAYCARE: "Creche / Petsitter",
+  APPOINTMENT: "Banho e tosa",
 };
+
+export function isTimedService(kind: ServiceKind) {
+  return kind === "DAYCARE" || kind === "APPOINTMENT";
+}
+
+export function isStayLike(kind: ServiceKind) {
+  return kind === "STAY" || kind === "DAYCARE";
+}
 
 export const WEEKDAY_LABELS: Record<number, string> = {
   1: "Segunda",
@@ -18,9 +27,10 @@ export const WEEKDAY_LABELS: Record<number, string> = {
 
 export const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0] as const;
 
-export const DEFAULT_SLOT_DURATION_MIN = 60;
+export const DEFAULT_SLOT_DURATION_MIN = 30;
 export const DEFAULT_STAY_CAPACITY = 10;
 export const DEFAULT_APPOINTMENT_CAPACITY = 1;
+export const DEFAULT_DAILY_CUTOFF = "12:00";
 
 export type WeekdayHours = {
   weekday: number;
@@ -41,7 +51,14 @@ export function defaultWeekdays(): WeekdayHours[] {
 }
 
 export function inferServiceKind(name: string): ServiceKind {
-  return /(banho|tosa|groom)/i.test(name) ? "APPOINTMENT" : "STAY";
+  if (/(banho|tosa|groom)/i.test(name)) return "APPOINTMENT";
+  if (/(creche|day\s?care|petsit|pet[\s-]?sitter)/i.test(name)) return "DAYCARE";
+  return "STAY";
+}
+
+export function effectiveServiceKind(kind: ServiceKind, name: string): ServiceKind {
+  if (kind !== "STAY") return kind;
+  return inferServiceKind(name);
 }
 
 export function toDateKey(value: Date | string) {
@@ -108,7 +125,12 @@ export function generateTimeSlots(
   return slots;
 }
 
-export function occupiedStayDays(startDate: Date, endDate: Date) {
+export function occupiedStayDays(
+  startDate: Date,
+  endDate: Date,
+  checkoutTime?: string | null,
+  cutoffTime = DEFAULT_DAILY_CUTOFF,
+) {
   const start = parseDateKey(toDateKey(startDate));
   const end = parseDateKey(toDateKey(endDate));
   const days: string[] = [];
@@ -122,6 +144,17 @@ export function occupiedStayDays(startDate: Date, endDate: Date) {
     days.push(toDateKey(cursor));
     cursor.setDate(cursor.getDate() + 1);
   }
+
+  if (
+    checkoutTime &&
+    TIME_PATTERN.test(checkoutTime) &&
+    TIME_PATTERN.test(cutoffTime) &&
+    checkoutTime > cutoffTime
+  ) {
+    const checkoutDay = toDateKey(end);
+    if (!days.includes(checkoutDay)) days.push(checkoutDay);
+  }
+
   return days;
 }
 

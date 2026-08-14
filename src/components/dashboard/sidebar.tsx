@@ -9,7 +9,6 @@ import {
   LifeBuoy,
   Settings,
   UserRound,
-  Users,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { cn } from "@/lib/utils";
@@ -20,10 +19,9 @@ const NAV = [
   { href: "/dashboard/check-in", label: "Entrada", icon: DoorOpen },
   { href: "/dashboard/check-out", label: "Saída", icon: DoorClosed },
   { href: "/dashboard/configuracoes", label: "Configurações", icon: Settings, adminOnly: true },
-  { href: "/dashboard/equipe", label: "Equipe", icon: Users, adminOnly: true },
   { href: "/dashboard/plano", label: "Plano", icon: CreditCard },
   { href: "/dashboard/suporte", label: "Suporte", icon: LifeBuoy },
-  { href: "/dashboard/conta", label: "Minha conta", icon: UserRound },
+  { href: "/dashboard/conta", label: "Minha conta", icon: UserRound, staffOnly: true },
 ];
 
 export function DashboardSidebar({
@@ -41,7 +39,11 @@ export function DashboardSidebar({
   logoUrl?: string | null;
   children: React.ReactNode;
 }) {
-  const items = NAV.filter((item) => !item.adminOnly || role === "ADMIN");
+  const items = NAV.filter(
+    (item) =>
+      (!item.adminOnly || role === "ADMIN") &&
+      (!item.staffOnly || role === "STAFF"),
+  );
 
   return (
     <AppShell

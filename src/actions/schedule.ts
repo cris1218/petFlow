@@ -4,11 +4,6 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireHotelAdminSession } from "@/lib/auth";
 import {
-  TIME_PATTERN,
-  WEEKDAY_ORDER,
-  type WeekdayHours,
-} from "@/lib/schedule";
-import {
   ensureTenantSchedule,
   getAppointmentSlots,
   getStayAvailability,
@@ -17,8 +12,11 @@ import {
 
 export async function getPublicStayAvailability(input: {
   tenantSlug: string;
+  serviceId: string;
   startDate: string;
   endDate: string;
+  checkoutTime?: string;
+  species?: "DOG" | "CAT" | "OTHER";
 }) {
   const tenant = await prisma.tenant.findUnique({
     where: { slug: input.tenantSlug },
@@ -36,8 +34,11 @@ export async function getPublicStayAvailability(input: {
 
   const availability = await getStayAvailability({
     tenantId: tenant.id,
+    serviceId: input.serviceId,
     startDate,
     endDate,
+    checkoutTime: input.checkoutTime,
+    species: input.species,
   });
 
   return { ok: true as const, ...availability };
@@ -45,6 +46,7 @@ export async function getPublicStayAvailability(input: {
 
 export async function getPublicAppointmentSlots(input: {
   tenantSlug: string;
+  serviceId: string;
   date: string;
 }) {
   const tenant = await prisma.tenant.findUnique({
@@ -57,6 +59,7 @@ export async function getPublicAppointmentSlots(input: {
 
   const slots = await getAppointmentSlots({
     tenantId: tenant.id,
+    serviceId: input.serviceId,
     dateKey: input.date,
   });
 
@@ -70,99 +73,41 @@ export async function getPublicAppointmentSlots(input: {
 }
 
 export async function saveHotelSchedule(input: {
-  stayCapacity: number;
-  appointmentCapacity: number;
-  slotDurationMin: number;
-  acceptsCats: boolean;
+  acceptsCatSmall: boolean;
+  acceptsCatMedium: boolean;
+  acceptsCatLarge: boolean;
   acceptsDogSmall: boolean;
   acceptsDogMedium: boolean;
   acceptsDogLarge: boolean;
-  weekdays: WeekdayHours[];
 }) {
   const { tenantId, user } = await requireHotelAdminSession();
   await ensureTenantSchedule(tenantId);
 
-  const stayCapacity = Math.floor(Number(input.stayCapacity));
-  const appointmentCapacity = Math.floor(Number(input.appointmentCapacity));
-  const slotDurationMin = Math.floor(Number(input.slotDurationMin));
-
-  if (!Number.isFinite(stayCapacity) || stayCapacity < 1 || stayCapacity > 200) {
-    return { ok: false as const, error: "A capacidade do hotel deve ser entre 1 e 200." };
-  }
-  if (
-    !Number.isFinite(appointmentCapacity) ||
-    appointmentCapacity < 1 ||
-    appointmentCapacity > 20
-  ) {
-    return {
-      ok: false as const,
-      error: "Quantos atendimentos ao mesmo tempo: informe de 1 a 20.",
-    };
-  }
-  if (
-    !Number.isFinite(slotDurationMin) ||
-    slotDurationMin < 15 ||
-    slotDurationMin > 240
-  ) {
-    return {
-      ok: false as const,
-      error: "A duração do horário deve ser entre 15 e 240 minutos.",
-    };
-  }
+  const acceptsCats =
+    input.acceptsCatSmall || input.acceptsCatMedium || input.acceptsCatLarge;
 
   if (
-    !input.acceptsCats &&
+    !acceptsCats &&
     !input.acceptsDogSmall &&
     !input.acceptsDogMedium &&
     !input.acceptsDogLarge
   ) {
     return {
       ok: false as const,
-      error: "Escolha ao menos gatos ou um porte de cão.",
+      error: "Escolha ao menos um porte de gato ou de cão.",
     };
-  }
-
-  const byWeekday = new Map(input.weekdays.map((day) => [day.weekday, day]));
-  for (const weekday of WEEKDAY_ORDER) {
-    const day = byWeekday.get(weekday);
-    if (!day) {
-      return { ok: false as const, error: "Informe os horários de todos os dias." };
-    }
-    if (!day.closed) {
-      if (!TIME_PATTERN.test(day.openTime) || !TIME_PATTERN.test(day.closeTime)) {
-        return { ok: false as const, error: "Use horários no formato 08:00." };
-      }
-      if (day.closeTime <= day.openTime) {
-        return {
-          ok: false as const,
-          error: "O horário de fechamento deve ser depois da abertura.",
-        };
-      }
-    }
   }
 
   await prisma.tenant.update({
     where: { id: tenantId },
     data: {
-      stayCapacity,
-      appointmentCapacity,
-      slotDurationMin,
-      acceptsCats: input.acceptsCats,
+      acceptsCats,
+      acceptsCatSmall: input.acceptsCatSmall,
+      acceptsCatMedium: input.acceptsCatMedium,
+      acceptsCatLarge: input.acceptsCatLarge,
       acceptsDogSmall: input.acceptsDogSmall,
       acceptsDogMedium: input.acceptsDogMedium,
       acceptsDogLarge: input.acceptsDogLarge,
-      weekdays: {
-        deleteMany: {},
-        create: WEEKDAY_ORDER.map((weekday) => {
-          const day = byWeekday.get(weekday)!;
-          return {
-            weekday,
-            openTime: day.openTime,
-            closeTime: day.closeTime,
-            closed: day.closed,
-          };
-        }),
-      },
     },
   });
 

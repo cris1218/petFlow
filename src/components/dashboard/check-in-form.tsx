@@ -39,9 +39,11 @@ export type CheckInBooking = {
 
 type CatalogItem = { id: string; name: string };
 
+const EMPTY_BELONGINGS: CatalogItem[] = [];
+
 export function CheckInForm({
   bookings,
-  belongings = [],
+  belongings = EMPTY_BELONGINGS,
   mode,
 }: {
   bookings: CheckInBooking[];
@@ -75,8 +77,12 @@ export function CheckInForm({
       belongings.map((item) => ({ itemName: item.name, quantity: 1, enabled: false })),
     );
     setCustomItem("");
-    setReturnedIds([]);
   }, [bookingId, belongings]);
+
+  useEffect(() => {
+    setReturnedIds([]);
+    setError(null);
+  }, [bookingId]);
 
   function submitCheckIn() {
     if (!bookingId) return;
@@ -231,17 +237,22 @@ export function CheckInForm({
                 {selected.checklist.map((item) => (
                   <label
                     key={item.id}
-                    className="flex min-h-11 items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                    className="flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm"
                   >
                     <input
                       type="checkbox"
+                      className="h-4 w-4 shrink-0"
                       checked={returnedIds.includes(item.id)}
                       onChange={(event) => {
-                        setReturnedIds((current) =>
-                          event.target.checked
-                            ? [...current, item.id]
-                            : current.filter((id) => id !== item.id),
-                        );
+                        const checked = event.target.checked;
+                        setReturnedIds((current) => {
+                          if (checked) {
+                            return current.includes(item.id)
+                              ? current
+                              : [...current, item.id];
+                          }
+                          return current.filter((id) => id !== item.id);
+                        });
                       }}
                     />
                     {item.itemName} × {item.quantity}

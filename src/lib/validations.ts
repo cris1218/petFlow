@@ -21,6 +21,10 @@ export const createBookingSchema = z.object({
     .string()
     .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Horário inválido.")
     .optional(),
+  checkoutTime: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Horário inválido.")
+    .optional(),
   tutor: z.object({
     name: z.string().min(2),
     phone: z

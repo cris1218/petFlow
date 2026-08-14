@@ -8,7 +8,7 @@ export default async function HotelSupportPage() {
   const tickets = await listHotelSupportTickets();
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
+    <div className="space-y-8">
       <div>
         <h1 className="text-xl font-semibold sm:text-2xl">Suporte</h1>
         <p className="text-sm text-muted-foreground">
