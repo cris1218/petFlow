@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { confirmPaidSubscription } from "@/actions/billing";
 import {
   getMercadoPagoPayment,
+  getPlatformMpToken,
+  parseSubscriptionExternalRef,
   resolveMercadoPagoToken,
 } from "@/lib/mercadopago";
 import { confirmPaidBooking } from "@/actions/bookings";
@@ -14,6 +17,34 @@ type MercadoPagoNotification = {
   action?: string;
   data?: { id?: string };
 };
+
+async function tryConfirmSubscription(paymentId: string) {
+  const byPayment = await prisma.subscriptionPayment.findUnique({
+    where: { mpPaymentId: String(paymentId) },
+    select: { id: true },
+  });
+
+  if (byPayment) {
+    const result = await confirmPaidSubscription(paymentId);
+    return { handled: true, kind: "subscription" as const, ...result };
+  }
+
+  const token = await getPlatformMpToken();
+  if (!token) {
+    return { handled: false as const };
+  }
+
+  try {
+    const payment = await getMercadoPagoPayment(paymentId, token);
+    if (!parseSubscriptionExternalRef(payment.externalReference)) {
+      return { handled: false as const };
+    }
+    const result = await confirmPaidSubscription(paymentId);
+    return { handled: true, kind: "subscription" as const, ...result };
+  } catch {
+    return { handled: false as const };
+  }
+}
 
 async function resolveAccessToken(paymentId: string) {
   const byPayment = await prisma.booking.findFirst({
@@ -66,7 +97,7 @@ async function confirmBookingFromPayment(paymentId: string) {
   }
 
   const bookingId = resolved.bookingId || payment.externalReference;
-  if (!bookingId) {
+  if (!bookingId || parseSubscriptionExternalRef(bookingId)) {
     return { processed: false, reason: "booking_not_found" };
   }
 
@@ -113,8 +144,13 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const subscription = await tryConfirmSubscription(paymentId);
+    if (subscription.handled) {
+      return NextResponse.json({ received: true, ...subscription }, { status: 200 });
+    }
+
     const result = await confirmBookingFromPayment(paymentId);
-    return NextResponse.json({ received: true, ...result }, { status: 200 });
+    return NextResponse.json({ received: true, kind: "booking", ...result }, { status: 200 });
   } catch (error) {
     console.error("[mercadopago-webhook]", error);
     return NextResponse.json(

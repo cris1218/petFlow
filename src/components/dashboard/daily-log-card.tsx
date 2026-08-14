@@ -13,7 +13,15 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { useFeedback } from "@/components/app-feedback";
 
 export type DailyLogStay = {
   bookingId: string;
@@ -39,10 +47,10 @@ export function DailyLogCard({ stays }: DailyLogCardProps) {
   const [statusNote, setStatusNote] = useState<string>(QUICK_STATUS_NOTES[0]);
   const [preview, setPreview] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
+  const { success } = useFeedback();
 
   const selected = useMemo(
     () => stays.find((stay) => stay.bookingId === bookingId),
@@ -54,7 +62,6 @@ export function DailyLogCard({ stays }: DailyLogCardProps) {
     setFile(nextFile);
     setPreview(URL.createObjectURL(nextFile));
     setError(null);
-    setMessage(null);
   }
 
   function handleSubmit() {
@@ -70,16 +77,15 @@ export function DailyLogCard({ stays }: DailyLogCardProps) {
 
     startTransition(async () => {
       setError(null);
-      setMessage(null);
       const result = await createDailyLog(formData);
       if (!result.ok) {
         setError(result.error);
         return;
       }
-      setMessage(
+      success(
         result.sentToWhatsApp
-          ? "Diário enviado no WhatsApp do tutor."
-          : "Diário registrado. O WhatsApp não confirmou o envio.",
+          ? "Diário enviado com sucesso."
+          : "Diário salvo com sucesso. O WhatsApp não confirmou o envio.",
       );
       setFile(null);
       setPreview(result.photoUrl);
@@ -110,22 +116,22 @@ export function DailyLogCard({ stays }: DailyLogCardProps) {
           Tire uma foto, escolha um status rápido e avise o tutor na hora.
         </CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-6 p-6 lg:grid-cols-[1fr_280px]">
+      <CardContent className="grid gap-6 p-4 sm:p-6 lg:grid-cols-[1fr_280px]">
         <div className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="pet">Pet hospedado</Label>
-            <select
-              id="pet"
-              value={bookingId}
-              onChange={(event) => setBookingId(event.target.value)}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-            >
-              {stays.map((stay) => (
-                <option key={stay.bookingId} value={stay.bookingId}>
-                  {stay.petName} · {stay.tutorName}
-                </option>
-              ))}
-            </select>
+            <Select value={bookingId} onValueChange={setBookingId}>
+              <SelectTrigger id="pet">
+                <SelectValue placeholder="Escolha o pet" />
+              </SelectTrigger>
+              <SelectContent>
+                {stays.map((stay) => (
+                  <SelectItem key={stay.bookingId} value={stay.bookingId}>
+                    {stay.petName} · {stay.tutorName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {selected && (
               <p className="text-xs text-muted-foreground">
                 {SPECIES_LABELS[selected.species as keyof typeof SPECIES_LABELS] ??
@@ -143,7 +149,7 @@ export function DailyLogCard({ stays }: DailyLogCardProps) {
                   key={note}
                   type="button"
                   onClick={() => setStatusNote(note)}
-                  className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                  className={`min-h-11 rounded-full border px-3 py-1.5 text-sm transition-colors ${
                     statusNote === note
                       ? "border-primary bg-primary text-primary-foreground"
                       : "border-input bg-background hover:bg-muted"
@@ -155,16 +161,17 @@ export function DailyLogCard({ stays }: DailyLogCardProps) {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <Button
               type="button"
               variant="outline"
+              className="w-full sm:w-auto"
               onClick={() => fileRef.current?.click()}
             >
               <Upload className="h-4 w-4" />
               Subir foto
             </Button>
-            <label className="inline-flex">
+            <label className="inline-flex w-full sm:w-auto">
               <input
                 type="file"
                 accept="image/*"
@@ -172,7 +179,7 @@ export function DailyLogCard({ stays }: DailyLogCardProps) {
                 className="hidden"
                 onChange={(event) => onFileChange(event.target.files?.[0])}
               />
-              <span className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-muted">
+              <span className="inline-flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-muted sm:w-auto">
                 <Camera className="h-4 w-4" />
                 Tirar foto
               </span>
@@ -186,7 +193,7 @@ export function DailyLogCard({ stays }: DailyLogCardProps) {
             />
           </div>
 
-          <Button onClick={handleSubmit} disabled={isPending} className="w-full sm:w-auto">
+          <Button onClick={handleSubmit} loading={isPending} className="w-full sm:w-auto">
             <Send className="h-4 w-4" />
             {isPending ? "Enviando..." : "Enviar Diário no WhatsApp"}
           </Button>
@@ -194,11 +201,6 @@ export function DailyLogCard({ stays }: DailyLogCardProps) {
           {error && (
             <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
               {error}
-            </p>
-          )}
-          {message && (
-            <p className="rounded-md bg-accent/10 px-3 py-2 text-sm text-accent">
-              {message}
             </p>
           )}
         </div>
@@ -221,7 +223,7 @@ export function DailyLogCard({ stays }: DailyLogCardProps) {
           </div>
           {selected?.recentLogs[0] && (
             <div className="rounded-lg border p-3 text-sm">
-              <div className="mb-1 flex items-center justify-between">
+              <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
                 <span className="font-medium">Último envio</span>
                 <Badge variant={selected.recentLogs[0].sentToWhatsApp ? "success" : "warning"}>
                   {selected.recentLogs[0].sentToWhatsApp ? "WhatsApp" : "Pendente"}

@@ -2,8 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireStaffSession } from "@/lib/auth";
-import { isPlatformAdmin } from "@/lib/platform";
+import { requireMasterSession } from "@/lib/auth";
 
 export async function submitAccessRequest(input: {
   hotelName: string;
@@ -38,10 +37,7 @@ export async function submitAccessRequest(input: {
 }
 
 export async function listAccessRequests() {
-  const { user } = await requireStaffSession();
-  if (!isPlatformAdmin(user.email)) {
-    return { ok: false as const, error: "Sem permissão." };
-  }
+  await requireMasterSession();
 
   const leads = await prisma.lead.findMany({
     orderBy: { createdAt: "desc" },
@@ -51,11 +47,8 @@ export async function listAccessRequests() {
 }
 
 export async function deleteAccessRequest(id: string) {
-  const { user } = await requireStaffSession();
-  if (!isPlatformAdmin(user.email)) {
-    return { ok: false as const, error: "Sem permissão." };
-  }
+  await requireMasterSession();
   await prisma.lead.delete({ where: { id } });
-  revalidatePath("/dashboard/leads");
+  revalidatePath("/admin/leads");
   return { ok: true as const };
 }

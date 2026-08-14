@@ -25,7 +25,31 @@ async function main() {
         where: { id: existingTenant.id },
         data: tenantData,
       })
-    : await prisma.tenant.create({ data: tenantData });
+    : await prisma.tenant.create({
+        data: {
+          ...tenantData,
+          services: {
+            create: [
+              { name: "Hotel", price: 80, sortOrder: 0, active: true },
+              { name: "Creche / diária", price: 50, sortOrder: 1, active: true },
+              { name: "Banho e tosa", price: 70, sortOrder: 2, active: true },
+            ],
+          },
+        },
+      });
+
+  const serviceCount = await prisma.tenantService.count({
+    where: { tenantId: tenant.id },
+  });
+  if (serviceCount === 0) {
+    await prisma.tenantService.createMany({
+      data: [
+        { tenantId: tenant.id, name: "Hotel", price: 80, sortOrder: 0, active: true },
+        { tenantId: tenant.id, name: "Creche / diária", price: 50, sortOrder: 1, active: true },
+        { tenantId: tenant.id, name: "Banho e tosa", price: 70, sortOrder: 2, active: true },
+      ],
+    });
+  }
 
   await prisma.user.upsert({
     where: { email: "maria.s@example.com" },
@@ -38,6 +62,26 @@ async function main() {
       role: "ADMIN",
     },
   });
+
+  const masterEmail = (process.env.MASTER_EMAIL || "iris.p@example.org").toLowerCase();
+  const existingMaster = await prisma.user.findFirst({
+    where: { role: "MASTER" },
+  });
+  if (!existingMaster) {
+    await prisma.user.create({
+      data: {
+        tenantId: null,
+        name: "Master PetFlow",
+        email: masterEmail,
+        passwordHash: await bcrypt.hash(
+          process.env.MASTER_PASSWORD || "altere-esta-senha",
+          10,
+        ),
+        role: "MASTER",
+      },
+    });
+    console.log(`Master criado: ${masterEmail}`);
+  }
 
   const tutor = await prisma.tutor.upsert({
     where: {

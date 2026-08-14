@@ -7,7 +7,7 @@ const COOKIE_NAME = "petflow_session";
 
 export type SessionPayload = {
   userId: string;
-  tenantId: string;
+  tenantId: string | null;
   role: UserRole;
   email: string;
 };
@@ -54,7 +54,7 @@ export async function getSession(): Promise<SessionPayload | null> {
 
 export async function requireStaffSession() {
   const session = await getSession();
-  if (!session) {
+  if (!session || session.role === "MASTER" || !session.tenantId) {
     throw new Error("Não autenticado.");
   }
 
@@ -63,9 +63,38 @@ export async function requireStaffSession() {
     include: { tenant: true },
   });
 
-  if (!user || user.tenant.status === "SUSPENDED") {
+  if (!user?.tenant || user.tenant.status === "SUSPENDED") {
     throw new Error("Sessão inválida.");
   }
 
-  return { session, user, tenantId: session.tenantId };
+  return {
+    session,
+    user: { ...user, tenant: user.tenant },
+    tenantId: session.tenantId,
+  };
+}
+
+export async function requireHotelAdminSession() {
+  const ctx = await requireStaffSession();
+  if (ctx.user.role !== "ADMIN") {
+    throw new Error("Apenas o gestor pode fazer isso.");
+  }
+  return ctx;
+}
+
+export async function requireMasterSession() {
+  const session = await getSession();
+  if (!session || session.role !== "MASTER") {
+    throw new Error("Não autenticado.");
+  }
+
+  const user = await prisma.user.findFirst({
+    where: { id: session.userId, role: "MASTER" },
+  });
+
+  if (!user) {
+    throw new Error("Sessão inválida.");
+  }
+
+  return { session, user };
 }

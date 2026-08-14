@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { requireStaffSession } from "@/lib/auth";
+import { requireHotelAdminSession } from "@/lib/auth";
 import { slugify } from "@/lib/utils";
 import {
   ensureWhatsAppInstance,
@@ -20,7 +20,7 @@ async function syncConnected(tenantId: string, instanceName: string) {
 }
 
 export async function getWhatsAppConnection() {
-  const { user, tenantId } = await requireStaffSession();
+  const { user, tenantId } = await requireHotelAdminSession();
   const instanceName =
     user.tenant.whatsappInstanceName ?? `petflow_${slugify(user.tenant.slug)}`;
 
@@ -38,7 +38,7 @@ export async function getWhatsAppConnection() {
 
 export async function pairWhatsApp() {
   try {
-    const { user, tenantId } = await requireStaffSession();
+    const { user, tenantId } = await requireHotelAdminSession();
     const instanceName =
       user.tenant.whatsappInstanceName ?? `petflow_${slugify(user.tenant.slug)}`;
 
@@ -73,7 +73,7 @@ export async function pairWhatsApp() {
 
 export async function refreshWhatsAppQr() {
   try {
-    const { user, tenantId } = await requireStaffSession();
+    const { user, tenantId } = await requireHotelAdminSession();
     const instanceName = user.tenant.whatsappInstanceName;
 
     if (!instanceName) {
@@ -119,7 +119,7 @@ export async function refreshWhatsAppQr() {
 }
 
 export async function markWhatsAppConnected(connected: boolean) {
-  const { tenantId } = await requireStaffSession();
+  const { tenantId } = await requireHotelAdminSession();
   await prisma.tenant.update({
     where: { id: tenantId },
     data: { whatsappConnected: connected },

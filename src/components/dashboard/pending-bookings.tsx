@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { markBookingPaid } from "@/actions/bookings";
+import { useFeedback } from "@/components/app-feedback";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -11,9 +12,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { SERVICE_LABELS } from "@/lib/constants";
+import { serviceLabel } from "@/lib/constants";
 import { formatBRL, formatDate } from "@/lib/utils";
-import { ServiceType } from "@prisma/client";
 
 type PendingBooking = {
   id: string;
@@ -29,6 +29,7 @@ type PendingBooking = {
 
 export function PendingBookings({ bookings }: { bookings: PendingBooking[] }) {
   const [isPending, startTransition] = useTransition();
+  const { success, error } = useFeedback();
 
   return (
     <Card>
@@ -46,9 +47,9 @@ export function PendingBookings({ bookings }: { bookings: PendingBooking[] }) {
         {bookings.map((booking) => (
           <div
             key={booking.id}
-            className="flex flex-wrap items-start justify-between gap-3 rounded-lg border p-3"
+            className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between"
           >
-            <div>
+            <div className="min-w-0">
               <p className="font-medium">{booking.petName}</p>
               <p className="text-sm text-muted-foreground">
                 {booking.tutorName} · {booking.tutorPhone}
@@ -58,19 +59,24 @@ export function PendingBookings({ bookings }: { bookings: PendingBooking[] }) {
                 sinal {formatBRL(booking.depositAmount)}
               </p>
             </div>
-            <div className="flex flex-col items-end gap-2">
-              <Badge variant="secondary">
-                {SERVICE_LABELS[booking.serviceType as ServiceType] ??
-                  booking.serviceType}
+            <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:items-end">
+              <Badge variant="secondary" className="w-fit">
+                {serviceLabel(booking.serviceType)}
               </Badge>
               <Button
                 size="sm"
+                className="w-full sm:w-auto"
                 onClick={() =>
                   startTransition(async () => {
-                    await markBookingPaid(booking.id);
+                    const result = await markBookingPaid(booking.id);
+                    if (!result.ok) {
+                      error(result.error ?? "Não foi possível confirmar.");
+                      return;
+                    }
+                    success("Reserva confirmada com sucesso.");
                   })
                 }
-                disabled={isPending}
+                loading={isPending}
               >
                 Confirmar e marcar pago
               </Button>

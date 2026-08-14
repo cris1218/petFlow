@@ -1,4 +1,4 @@
-import { formatDate, toWhatsAppNumber } from "@/lib/utils";
+import { formatBookingWhen, toWhatsAppNumber } from "@/lib/utils";
 import { readEnv } from "@/lib/env";
 
 type ConfirmationInput = {
@@ -6,6 +6,7 @@ type ConfirmationInput = {
   petName: string;
   startDate: Date;
   endDate: Date;
+  slotTime?: string | null;
 };
 
 type DailyLogInput = {
@@ -19,8 +20,8 @@ type ReminderInput = {
 };
 
 export const whatsappTemplates = {
-  confirmation({ tutorName, petName, startDate, endDate }: ConfirmationInput) {
-    return `Olá ${tutorName}! A reserva do ${petName} de ${formatDate(startDate)} a ${formatDate(endDate)} foi CONFIRMADA! 🐾`;
+  confirmation({ tutorName, petName, startDate, endDate, slotTime }: ConfirmationInput) {
+    return `Olá ${tutorName}! A reserva do ${petName} (${formatBookingWhen(startDate, endDate, slotTime)}) foi CONFIRMADA! 🐾`;
   },
   dailyLog({ photoUrl, statusNote }: DailyLogInput) {
     return `Olha quem está se divertindo! 📸 ${photoUrl} - Status: ${statusNote}`;
@@ -247,6 +248,12 @@ export async function ensureWhatsAppInstance(instanceName: string) {
     await sleep(800);
   }
   return pollQr(instanceName);
+}
+
+export async function deleteWhatsAppInstance(instanceName: string) {
+  await evolutionRequest(`/instance/delete/${instanceName}`, {
+    method: "DELETE",
+  });
 }
 
 export async function sendWhatsAppText(input: {

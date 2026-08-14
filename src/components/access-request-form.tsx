@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { submitAccessRequest } from "@/actions/leads";
+import { useFeedback } from "@/components/app-feedback";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +16,7 @@ export function AccessRequestForm() {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const { success } = useFeedback();
 
   if (done) {
     return (
@@ -45,6 +47,7 @@ export function AccessRequestForm() {
             return;
           }
           setDone(true);
+          success("Pedido enviado com sucesso.");
         });
       }}
     >
@@ -66,11 +69,11 @@ export function AccessRequestForm() {
           value={notes}
           onChange={(event) => setNotes(event.target.value)}
           rows={3}
-          className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-base sm:text-sm"
         />
       </div>
       {error && <p className="text-sm text-destructive">{error}</p>}
-      <Button type="submit" disabled={isPending}>
+      <Button type="submit" className="w-full sm:w-auto" loading={isPending}>
         {isPending ? "Enviando..." : "Pedir acesso"}
       </Button>
     </form>

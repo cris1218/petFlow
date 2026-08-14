@@ -27,6 +27,42 @@ function ensureConfig() {
 }
 
 export async function uploadDailyLogPhoto(file: File) {
+  return uploadImage(file, {
+    folder: "petflow/daily-logs",
+    transformation: [
+      { width: 1600, height: 1600, crop: "limit", quality: "auto" },
+    ],
+  });
+}
+
+export async function uploadHotelLogo(file: File, tenantId: string) {
+  return uploadImage(file, {
+    folder: "petflow/logos",
+    public_id: tenantId,
+    overwrite: true,
+    invalidate: true,
+    transformation: [
+      { width: 800, height: 800, crop: "limit", quality: "auto" },
+    ],
+  });
+}
+
+export async function deleteHotelLogo(tenantId: string) {
+  if (!configured()) return;
+  ensureConfig();
+  await cloudinary.uploader.destroy(`petflow/logos/${tenantId}`);
+}
+
+async function uploadImage(
+  file: File,
+  options: {
+    folder: string;
+    public_id?: string;
+    overwrite?: boolean;
+    invalidate?: boolean;
+    transformation: Array<Record<string, unknown>>;
+  },
+) {
   ensureConfig();
 
   const bytes = Buffer.from(await file.arrayBuffer());
@@ -35,15 +71,16 @@ export async function uploadDailyLogPhoto(file: File) {
     cloudinary.uploader
       .upload_stream(
         {
-          folder: "petflow/daily-logs",
+          folder: options.folder,
+          public_id: options.public_id,
+          overwrite: options.overwrite,
+          invalidate: options.invalidate,
           resource_type: "image",
-          transformation: [
-            { width: 1600, height: 1600, crop: "limit", quality: "auto" },
-          ],
+          transformation: options.transformation,
         },
         (error, result) => {
           if (error || !result?.secure_url) {
-            reject(error ?? new Error("Falha no upload da foto."));
+            reject(error ?? new Error("Falha no upload da imagem."));
             return;
           }
           resolve(result.secure_url);

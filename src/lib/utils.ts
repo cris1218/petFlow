@@ -20,6 +20,23 @@ export function formatDate(date: Date | string) {
   }).format(new Date(date));
 }
 
+export function formatTime(value: string) {
+  return value;
+}
+
+export function formatBookingWhen(
+  startDate: Date | string,
+  endDate: Date | string,
+  slotTime?: string | null,
+) {
+  const start = formatDate(startDate);
+  if (slotTime) {
+    return `${start} às ${slotTime}`;
+  }
+  const end = formatDate(endDate);
+  return start === end ? start : `${start} → ${end}`;
+}
+
 export function toWhatsAppNumber(phone: string) {
   const digits = phone.replace(/\D/g, "");
   if (digits.startsWith("55")) return digits;

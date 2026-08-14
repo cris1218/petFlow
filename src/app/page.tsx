@@ -2,39 +2,41 @@ import Link from "next/link";
 import { CalendarDays, Camera, MessageCircle, PawPrint, ShieldCheck } from "lucide-react";
 import { APP_NAME, APP_SLOGAN } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
-import { AccessRequestForm } from "@/components/access-request-form";
+import { HotelSignupForm } from "@/components/hotel-signup-form";
+import { BILLING } from "@/lib/billing";
+import { formatBRL } from "@/lib/utils";
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#fff4ea,_#f7f3ee_45%,_#eef6f2)]">
-      <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
-        <div className="flex items-center gap-2 font-semibold">
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+    <div className="min-h-dvh bg-[radial-gradient(circle_at_top,_#fff4ea,_#f7f3ee_45%,_#eef6f2)]">
+      <header className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4 sm:px-6 sm:py-6">
+        <div className="flex min-w-0 items-center gap-2 font-semibold">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <PawPrint className="h-5 w-5" />
           </span>
-          {APP_NAME}
+          <span className="truncate">{APP_NAME}</span>
         </div>
-        <Button asChild>
-          <Link href="/login">Entrar no painel</Link>
+        <Button asChild size="sm" className="shrink-0 sm:h-11 sm:px-4">
+          <Link href="/login">Entrar</Link>
         </Button>
       </header>
 
-      <main className="mx-auto max-w-6xl px-6 pb-20 pt-10">
-        <p className="mb-3 text-sm font-medium uppercase tracking-widest text-primary">
+      <main className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
+        <p className="mb-3 text-xs font-medium uppercase tracking-widest text-primary sm:text-sm">
           Sistema para hotéis e creches pet
         </p>
-        <h1 className="max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl">
+        <h1 className="max-w-3xl text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl">
           {APP_SLOGAN}
         </h1>
-        <p className="mt-4 max-w-2xl text-lg text-muted-foreground">
+        <p className="mt-4 max-w-2xl text-base text-muted-foreground sm:text-lg">
           Agenda, vacinas, pertences e diário de bordo — com confirmação no
           WhatsApp e sinal via PIX da conta do próprio hotel.
         </p>
-        <div className="mt-8 flex flex-wrap gap-3">
-          <Button asChild size="lg">
-            <a href="#pedir-acesso">Pedir acesso</a>
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+          <Button asChild size="lg" className="w-full sm:w-auto">
+            <a href="#cadastrar">Começar grátis</a>
           </Button>
-          <Button asChild variant="outline" size="lg">
+          <Button asChild variant="outline" size="lg" className="w-full sm:w-auto">
             <Link href="/agendar/hotel-do-ron-ron">Ver portal de exemplo</Link>
           </Button>
         </div>
@@ -63,12 +65,15 @@ export default function HomePage() {
         </div>
 
         <section className="mt-20 max-w-2xl">
-          <h2 className="text-2xl font-semibold">Quer o PetFlow no seu hotel?</h2>
+          <h2 className="text-xl font-semibold sm:text-2xl">Cadastre seu hotel</h2>
           <p className="mt-2 mb-6 text-muted-foreground">
-            Estamos liberando um estabelecimento de cada vez. Deixe seus dados e
-            falamos com você.
+            {BILLING.trialDays} dias grátis. Depois {formatBRL(BILLING.introPrice)}{" "}
+            por {BILLING.introMonths} meses e, em seguida,{" "}
+            {formatBRL(BILLING.fullPrice)} por mês. O cadastro inicial é de 1
+            gestor. Cada usuário extra da equipe custa{" "}
+            {formatBRL(BILLING.extraUserPrice)}.
           </p>
-          <AccessRequestForm />
+          <HotelSignupForm />
         </section>
       </main>
     </div>

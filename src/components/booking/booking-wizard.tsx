@@ -18,13 +18,19 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  SERVICE_LABELS,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   SIZE_LABELS,
   SPECIES_LABELS,
 } from "@/lib/constants";
-import { calculateStayPricing, dailyRateFor, TenantRates } from "@/lib/pricing";
-import { formatBRL, formatDate, vaccineStatusFromExpiration } from "@/lib/utils";
-import { ServiceType } from "@prisma/client";
+import { BookableService, calculateStayPricing } from "@/lib/pricing";
+import { formatBRL, formatDate } from "@/lib/utils";
+import { useFeedback } from "@/components/app-feedback";
 
 const STEPS = [
   "Serviço e período",
@@ -36,18 +42,24 @@ const STEPS = [
 type WizardProps = {
   tenantName: string;
   tenantSlug: string;
-  rates: TenantRates;
+  tenantLogoUrl?: string | null;
+  services: BookableService[];
+  depositRate: number;
+  requiredVaccines: Array<{ id: string; name: string }>;
   pixEnabled: boolean;
 };
 
 export function BookingWizard({
   tenantName,
   tenantSlug,
-  rates,
+  tenantLogoUrl,
+  services,
+  depositRate,
+  requiredVaccines,
   pixEnabled,
 }: WizardProps) {
   const [step, setStep] = useState(1);
-  const [serviceType, setServiceType] = useState<ServiceType>("HOTEL");
+  const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [tutor, setTutor] = useState({
@@ -64,42 +76,29 @@ export function BookingWizard({
     size: "MEDIUM" as "SMALL" | "MEDIUM" | "LARGE",
     notes: "",
   });
-  const [vaccines, setVaccines] = useState([
-    { name: "V10", applicationDate: "", expirationDate: "" },
-    { name: "Raiva", applicationDate: "", expirationDate: "" },
-  ]);
+  const [hasVaccines, setHasVaccines] = useState<string[]>([]);
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [pix, setPix] = useState<{
     qrCode: string;
     qrCodeBase64: string;
   } | null>(null);
-  const [expiredVaccines, setExpiredVaccines] = useState<string[]>([]);
+  const [missingVaccines, setMissingVaccines] = useState<string[]>([]);
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const { success } = useFeedback();
+
+  const selectedService = services.find((service) => service.id === serviceId) ?? services[0];
 
   const pricing = useMemo(() => {
-    if (!startDate || !endDate) return null;
+    if (!startDate || !endDate || !selectedService) return null;
     const start = new Date(`${startDate}T12:00:00`);
     const end = new Date(`${endDate}T12:00:00`);
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
       return null;
     }
-    return calculateStayPricing(serviceType, start, end, rates);
-  }, [serviceType, startDate, endDate, rates]);
-
-  const vaccineAlerts = useMemo(
-    () =>
-      vaccines
-        .filter((vaccine) => vaccine.name && vaccine.expirationDate)
-        .filter(
-          (vaccine) =>
-            vaccineStatusFromExpiration(new Date(`${vaccine.expirationDate}T12:00:00`)) ===
-            "EXPIRED",
-        )
-        .map((vaccine) => vaccine.name),
-    [vaccines],
-  );
+    return calculateStayPricing(selectedService.price, start, end, depositRate);
+  }, [selectedService, startDate, endDate, depositRate]);
 
   useEffect(() => {
     if (step !== 3 || !bookingId || confirmed) return;
@@ -109,6 +108,7 @@ export function BookingWizard({
       if (result.ok && result.confirmed) {
         setConfirmed(true);
         setStep(4);
+        success("Reserva confirmada com sucesso.");
       }
     }, 4000);
 
@@ -116,6 +116,10 @@ export function BookingWizard({
   }, [step, bookingId, confirmed]);
 
   function goStep2() {
+    if (!selectedService) {
+      setError("Este hotel ainda não tem serviços ativos.");
+      return;
+    }
     if (!startDate || !endDate) {
       setError("Escolha as datas da estadia.");
       return;
@@ -129,6 +133,11 @@ export function BookingWizard({
   }
 
   function submitBooking() {
+    if (!selectedService) {
+      setError("Este hotel ainda não tem serviços ativos.");
+      return;
+    }
+    const service = selectedService;
     if (!tutor.name || !tutor.phone || !pet.name) {
       setError("Preencha os dados do tutor e do pet.");
       return;
@@ -138,18 +147,12 @@ export function BookingWizard({
       setError(null);
       const result = await createBooking({
         tenantSlug,
-        serviceType,
+        serviceId: service.id,
         startDate: `${startDate}T12:00:00`,
         endDate: `${endDate}T12:00:00`,
         tutor,
         pet,
-        vaccines: vaccines
-          .filter((vaccine) => vaccine.name && vaccine.applicationDate && vaccine.expirationDate)
-          .map((vaccine) => ({
-            name: vaccine.name,
-            applicationDate: `${vaccine.applicationDate}T12:00:00`,
-            expirationDate: `${vaccine.expirationDate}T12:00:00`,
-          })),
+        vaccines: hasVaccines.map((name) => ({ name })),
       });
 
       if (!result.ok) {
@@ -159,16 +162,26 @@ export function BookingWizard({
 
       setBookingId(result.bookingId);
       setPix(result.pix);
-      setExpiredVaccines(result.expiredVaccines);
+      setMissingVaccines(result.missingVaccines);
       setStep(3);
+      success("Reserva enviada com sucesso.");
     });
   }
 
   return (
-    <Card className="mx-auto max-w-3xl">
+    <Card className="mx-auto w-full max-w-3xl">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <PawPrint className="h-5 w-5 text-primary" />
+        <CardTitle className="flex min-w-0 items-center gap-2">
+          {tenantLogoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={tenantLogoUrl}
+              alt=""
+              className="h-8 w-8 rounded-md object-contain"
+            />
+          ) : (
+            <PawPrint className="h-5 w-5 text-primary" />
+          )}
           Agendar em {tenantName}
         </CardTitle>
         <CardDescription>
@@ -186,25 +199,31 @@ export function BookingWizard({
       <CardContent className="space-y-6">
         {step === 1 && (
           <div className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-3">
-              {(Object.keys(SERVICE_LABELS) as ServiceType[]).map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => setServiceType(type)}
-                  className={`rounded-xl border p-4 text-left ${
-                    serviceType === type
-                      ? "border-primary bg-primary/5"
-                      : "hover:bg-muted"
-                  }`}
-                >
-                  <p className="font-semibold">{SERVICE_LABELS[type]}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {formatBRL(dailyRateFor(type, rates))} / diária
-                  </p>
-                </button>
-              ))}
-            </div>
+            {services.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Este estabelecimento ainda não cadastrou serviços ativos.
+              </p>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {services.map((service) => (
+                  <button
+                    key={service.id}
+                    type="button"
+                    onClick={() => setServiceId(service.id)}
+                    className={`rounded-xl border p-4 text-left ${
+                      serviceId === service.id
+                        ? "border-primary bg-primary/5"
+                        : "hover:bg-muted"
+                    }`}
+                  >
+                    <p className="font-semibold">{service.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {formatBRL(service.price)} / diária
+                    </p>
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="start">Entrada</Label>
@@ -231,7 +250,9 @@ export function BookingWizard({
                 Sinal {formatBRL(pricing.depositAmount)}
               </p>
             )}
-            <Button onClick={goStep2}>Continuar</Button>
+            <Button className="w-full sm:w-auto" onClick={goStep2} disabled={services.length === 0}>
+              Continuar
+            </Button>
           </div>
         )}
 
@@ -280,86 +301,80 @@ export function BookingWizard({
               />
               <div className="space-y-2">
                 <Label>Espécie</Label>
-                <select
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                <Select
                   value={pet.species}
-                  onChange={(event) =>
-                    setPet({ ...pet, species: event.target.value as typeof pet.species })
+                  onValueChange={(value) =>
+                    setPet({ ...pet, species: value as typeof pet.species })
                   }
                 >
-                  {Object.entries(SPECIES_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Espécie" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(SPECIES_LABELS).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label>Porte</Label>
-                <select
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                <Select
                   value={pet.size}
-                  onChange={(event) =>
-                    setPet({ ...pet, size: event.target.value as typeof pet.size })
+                  onValueChange={(value) =>
+                    setPet({ ...pet, size: value as typeof pet.size })
                   }
                 >
-                  {Object.entries(SIZE_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Porte" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(SIZE_LABELS).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div className="space-y-3">
-              <Label>Vacinas</Label>
-              {vaccines.map((vaccine, index) => (
-                <div key={vaccine.name} className="grid gap-2 sm:grid-cols-3">
-                  <Input
-                    value={vaccine.name}
-                    onChange={(event) => {
-                      const next = [...vaccines];
-                      next[index] = { ...vaccine, name: event.target.value };
-                      setVaccines(next);
-                    }}
-                  />
-                  <Input
-                    type="date"
-                    value={vaccine.applicationDate}
-                    onChange={(event) => {
-                      const next = [...vaccines];
-                      next[index] = {
-                        ...vaccine,
-                        applicationDate: event.target.value,
-                      };
-                      setVaccines(next);
-                    }}
-                  />
-                  <Input
-                    type="date"
-                    value={vaccine.expirationDate}
-                    onChange={(event) => {
-                      const next = [...vaccines];
-                      next[index] = {
-                        ...vaccine,
-                        expirationDate: event.target.value,
-                      };
-                      setVaccines(next);
-                    }}
-                  />
-                </div>
-              ))}
-              {vaccineAlerts.length > 0 && (
-                <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-                  Vacinas vencidas: {vaccineAlerts.join(", ")}. O hotel será alertado no check-in.
+              <Label>Vacinas que o pet tem</Label>
+              {requiredVaccines.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Este hotel ainda não cadastrou vacinas obrigatórias.
                 </p>
+              ) : (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {requiredVaccines.map((vaccine) => (
+                    <label
+                      key={vaccine.id}
+                      className="flex min-h-11 items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={hasVaccines.includes(vaccine.name)}
+                        onChange={(event) =>
+                          setHasVaccines((current) =>
+                            event.target.checked
+                              ? [...current, vaccine.name]
+                              : current.filter((name) => name !== vaccine.name),
+                          )
+                        }
+                      />
+                      {vaccine.name}
+                    </label>
+                  ))}
+                </div>
               )}
             </div>
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={() => setStep(1)}>
+            <div className="flex flex-col-reverse gap-3 sm:flex-row">
+              <Button variant="outline" className="w-full sm:w-auto" onClick={() => setStep(1)}>
                 Voltar
               </Button>
-              <Button onClick={submitBooking} disabled={isPending}>
+              <Button className="w-full sm:w-auto" onClick={submitBooking} loading={isPending}>
                 {isPending
                   ? "Enviando..."
                   : pixEnabled
@@ -387,7 +402,7 @@ export function BookingWizard({
                         : `data:image/png;base64,${pix.qrCodeBase64}`
                     }
                     alt="QR Code PIX"
-                    className="mx-auto h-56 w-56 rounded-xl border bg-white p-3"
+                    className="mx-auto h-44 w-44 rounded-xl border bg-white p-3 sm:h-56 sm:w-56"
                   />
                 ) : (
                   <div className="rounded-xl border bg-muted p-4 text-center text-sm">
@@ -408,9 +423,9 @@ export function BookingWizard({
                 estabelecimento confirmar, esta página atualiza sozinha.
               </p>
             )}
-            {expiredVaccines.length > 0 && (
+            {missingVaccines.length > 0 && (
               <Badge variant="warning">
-                Vacinas vencidas: {expiredVaccines.join(", ")}
+                Vacinas não informadas: {missingVaccines.join(", ")}
               </Badge>
             )}
           </div>

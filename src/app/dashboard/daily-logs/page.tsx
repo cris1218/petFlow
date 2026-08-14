@@ -7,7 +7,7 @@ export default async function DailyLogsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Diário de bordo</h1>
+        <h1 className="text-xl font-semibold sm:text-2xl">Diário de bordo</h1>
         <p className="text-sm text-muted-foreground">
           Envie fotos e status rápidos para o WhatsApp do tutor.
         </p>

@@ -6,9 +6,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { BOOKING_STATUS_LABELS, SERVICE_LABELS } from "@/lib/constants";
+import { BOOKING_STATUS_LABELS, serviceLabel } from "@/lib/constants";
 import { formatDate } from "@/lib/utils";
-import { ServiceType } from "@prisma/client";
 
 type Stay = {
   id: string;
@@ -44,18 +43,18 @@ function StayList({
         {stays.map((stay) => (
           <div
             key={stay.id}
-            className="flex items-start justify-between rounded-lg border p-3"
+            className="flex items-start justify-between gap-3 rounded-lg border p-3"
           >
-            <div>
+            <div className="min-w-0">
               <p className="font-medium">{stay.petName}</p>
               <p className="text-sm text-muted-foreground">{stay.tutorName}</p>
               <p className="text-xs text-muted-foreground">
                 {formatDate(stay.startDate)} → {formatDate(stay.endDate)}
               </p>
             </div>
-            <div className="flex flex-col items-end gap-1">
+            <div className="flex shrink-0 flex-col items-end gap-1">
               <Badge variant="secondary">
-                {SERVICE_LABELS[stay.serviceType as ServiceType] ?? stay.serviceType}
+                {serviceLabel(stay.serviceType)}
               </Badge>
               <Badge variant="outline">
                 {BOOKING_STATUS_LABELS[

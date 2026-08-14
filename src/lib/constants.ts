@@ -1,20 +1,6 @@
-import { ServiceType } from "@prisma/client";
-
 export const APP_NAME = "PetFlow";
 export const APP_SLOGAN =
   "Hospedagem, agendamentos e diário de bordo direto no WhatsApp.";
-
-export const SERVICE_LABELS: Record<ServiceType, string> = {
-  HOTEL: "Hotel",
-  DAYCARE: "Creche",
-  GROOMING: "Banho e tosa",
-};
-
-export const SERVICE_DAILY_RATE: Record<ServiceType, number> = {
-  HOTEL: 80,
-  DAYCARE: 50,
-  GROOMING: 70,
-};
 
 export const DEPOSIT_RATE = 0.3;
 
@@ -39,6 +25,13 @@ export const SIZE_LABELS = {
   LARGE: "Grande",
 } as const;
 
+export const SUPPORT_STATUS_LABELS = {
+  OPEN: "Aberto",
+  WAITING_HOTEL: "Aguardando hotel",
+  WAITING_MASTER: "Aguardando suporte",
+  CLOSED: "Encerrado",
+} as const;
+
 export const BOOKING_STATUS_LABELS = {
   PENDING: "Pendente",
   CONFIRMED: "Confirmada",
@@ -46,3 +39,13 @@ export const BOOKING_STATUS_LABELS = {
   CHECKED_OUT: "Check-out",
   CANCELLED: "Cancelada",
 } as const;
+
+const LEGACY_SERVICE_LABELS: Record<string, string> = {
+  HOTEL: "Hotel",
+  DAYCARE: "Creche",
+  GROOMING: "Banho e tosa",
+};
+
+export function serviceLabel(value: string) {
+  return LEGACY_SERVICE_LABELS[value] ?? value;
+}

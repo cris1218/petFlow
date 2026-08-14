@@ -5,11 +5,21 @@ export const loginSchema = z.object({
   password: z.string().min(6, "Senha deve ter ao menos 6 caracteres."),
 });
 
+export const updateAccountSchema = z.object({
+  email: z.string().email("E-mail inválido."),
+  newPassword: z.string().optional(),
+  confirmPassword: z.string().optional(),
+});
+
 export const createBookingSchema = z.object({
   tenantSlug: z.string().min(1),
-  serviceType: z.enum(["HOTEL", "DAYCARE", "GROOMING"]),
+  serviceId: z.string().min(1),
   startDate: z.coerce.date(),
   endDate: z.coerce.date(),
+  slotTime: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Horário inválido.")
+    .optional(),
   tutor: z.object({
     name: z.string().min(2),
     phone: z.string().min(10),
@@ -29,8 +39,6 @@ export const createBookingSchema = z.object({
     .array(
       z.object({
         name: z.string().min(1),
-        applicationDate: z.coerce.date(),
-        expirationDate: z.coerce.date(),
       }),
     )
     .optional()

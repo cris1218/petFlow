@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { APP_NAME, APP_SLOGAN } from "@/lib/constants";
+import { AppFeedback } from "@/components/app-feedback";
 import "./globals.css";
 
 const geistSans = localFont({
@@ -23,6 +24,12 @@ export const metadata: Metadata = {
   description: APP_SLOGAN,
 };
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover" as const,
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -31,9 +38,9 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} min-h-screen font-sans`}
+        className={`${geistSans.variable} ${geistMono.variable} min-h-dvh font-sans`}
       >
-        {children}
+        <AppFeedback>{children}</AppFeedback>
       </body>
     </html>
   );

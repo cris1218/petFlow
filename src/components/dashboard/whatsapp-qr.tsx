@@ -17,6 +17,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useFeedback } from "@/components/app-feedback";
 
 export function WhatsAppQrCard({
   connected,
@@ -33,6 +34,7 @@ export function WhatsAppQrCard({
   const [status, setStatus] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
+  const { success } = useFeedback();
 
   async function requestQr(refresh: boolean): Promise<"qr" | "wait" | "error" | "connected"> {
     const result = refresh ? await refreshWhatsAppQr() : await pairWhatsApp();
@@ -44,6 +46,7 @@ export function WhatsAppQrCard({
     if ("connected" in result && result.connected) {
       setStatus("WhatsApp conectado.");
       setQr(null);
+      success("WhatsApp conectado com sucesso.");
       return "connected";
     }
     setMocked(result.mocked);
@@ -86,12 +89,12 @@ export function WhatsAppQrCard({
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <QrCode className="h-5 w-5 text-primary" />
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <CardTitle className="flex min-w-0 items-center gap-2">
+            <QrCode className="h-5 w-5 shrink-0 text-primary" />
             Conexão WhatsApp
           </CardTitle>
-          <Badge variant={connected ? "success" : "warning"}>
+          <Badge className="shrink-0" variant={connected ? "success" : "warning"}>
             {connected ? "Conectado" : "Aguardando pareamento"}
           </Badge>
         </div>
@@ -102,7 +105,7 @@ export function WhatsAppQrCard({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex aspect-square max-w-xs items-center justify-center rounded-xl border bg-muted p-4">
+        <div className="mx-auto flex aspect-square w-full max-w-xs items-center justify-center rounded-xl border bg-muted p-4">
           {qr ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -119,22 +122,27 @@ export function WhatsAppQrCard({
             </p>
           )}
         </div>
-        <div className="flex flex-wrap gap-3">
-          <Button onClick={() => loadQr(false)} disabled={isPending}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+          <Button className="w-full sm:w-auto" onClick={() => loadQr(false)} loading={isPending}>
             {isPending ? "Gerando..." : "Gerar QR Code"}
           </Button>
           <Button
+            className="w-full sm:w-auto"
             variant="outline"
             onClick={() => loadQr(true)}
-            disabled={isPending}
+            loading={isPending}
           >
             Atualizar
           </Button>
           <Button
+            className="w-full sm:w-auto"
             variant="secondary"
+            loading={isPending}
             onClick={() =>
               startTransition(async () => {
                 await markWhatsAppConnected(true);
+                success();
+                router.refresh();
               })
             }
           >

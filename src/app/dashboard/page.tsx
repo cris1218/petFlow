@@ -11,7 +11,7 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Visão geral</h1>
+        <h1 className="text-xl font-semibold sm:text-2xl">Visão geral</h1>
         <p className="text-sm text-muted-foreground">
           Ocupação do dia, check-ins e check-outs.
         </p>
