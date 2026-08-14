@@ -6,6 +6,19 @@ export async function getTenantBySlug(slug: string) {
   });
 }
 
+export async function listPublicPortals() {
+  return prisma.tenant.findMany({
+    where: { status: { not: "SUSPENDED" } },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      logoUrl: true,
+    },
+    orderBy: { name: "asc" },
+  });
+}
+
 export function tenantWhere(tenantId: string) {
   return { tenantId };
 }

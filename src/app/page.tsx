@@ -29,19 +29,19 @@ export default function HomePage() {
           {APP_SLOGAN}
         </h1>
         <p className="mt-4 max-w-2xl text-base text-muted-foreground sm:text-lg">
-          Agenda, vacinas, pertences e diário de bordo — com confirmação no
-          WhatsApp e sinal via PIX da conta do próprio hotel.
+          Agenda, pertences e diário de bordo — com confirmação no WhatsApp e
+          entrada via PIX da conta do próprio hotel.
         </p>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
           <Button asChild size="lg" className="w-full sm:w-auto">
             <a href="#cadastrar">Começar grátis</a>
           </Button>
           <Button asChild variant="outline" size="lg" className="w-full sm:w-auto">
-            <Link href="/agendar/hotel-do-ron-ron">Ver portal de exemplo</Link>
+            <Link href="/portais">Ver portais</Link>
           </Button>
         </div>
 
-        <div className="mt-16 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-16 grid grid-cols-2 gap-4 sm:grid-cols-4">
           <Feature
             icon={CalendarDays}
             title="Agenda e ocupação"
@@ -54,8 +54,8 @@ export default function HomePage() {
           />
           <Feature
             icon={ShieldCheck}
-            title="Vacinas e pertences"
-            text="Checklist de vacinas e pertences: ração, medicação, coleira e o que o hotel exigir."
+            title="Pertences"
+            text="Checklist na entrada e na saída, com o que o hotel exigir."
           />
           <Feature
             icon={MessageCircle}
@@ -66,12 +66,10 @@ export default function HomePage() {
 
         <section className="mt-20 max-w-2xl">
           <h2 className="text-xl font-semibold sm:text-2xl">Cadastre seu hotel</h2>
-          <p className="mt-2 mb-6 text-muted-foreground">
-            {BILLING.trialDays} dias grátis. Depois {formatBRL(BILLING.introPrice)}{" "}
-            por {BILLING.introMonths} meses e, em seguida,{" "}
-            {formatBRL(BILLING.fullPrice)} por mês. O cadastro inicial é de 1
-            gestor. Cada usuário extra da equipe custa{" "}
-            {formatBRL(BILLING.extraUserPrice)}.
+          <p className="mt-1 mb-5 text-xs text-muted-foreground">
+            {BILLING.trialDays} dias grátis · depois {formatBRL(BILLING.introPrice)}{" "}
+            por {BILLING.introMonths} meses · em seguida {formatBRL(BILLING.fullPrice)}
+            /mês · 1 gestor incluso · extra {formatBRL(BILLING.extraUserPrice)}
           </p>
           <HotelSignupForm />
         </section>

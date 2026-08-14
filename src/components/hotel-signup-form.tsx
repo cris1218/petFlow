@@ -8,8 +8,6 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { WhatsAppInput } from "@/components/ui/whatsapp-input";
 import { Label } from "@/components/ui/label";
-import { BILLING } from "@/lib/billing";
-import { formatBRL } from "@/lib/utils";
 
 export function HotelSignupForm() {
   const [hotelName, setHotelName] = useState("");
@@ -65,12 +63,6 @@ export function HotelSignupForm() {
           required
         />
       </div>
-      <p className="text-xs text-muted-foreground">
-        {BILLING.trialDays} dias grátis. Depois {formatBRL(BILLING.introPrice)}{" "}
-        por {BILLING.introMonths} meses e em seguida {formatBRL(BILLING.fullPrice)}{" "}
-        / mês. O cadastro cria 1 gestor. Cada usuário extra da equipe custa{" "}
-        {formatBRL(BILLING.extraUserPrice)}.
-      </p>
       {error && <p className="text-sm text-destructive">{error}</p>}
       <Button type="submit" className="w-full sm:w-auto" loading={isPending}>
         {isPending ? "Criando..." : "Começar grátis"}
