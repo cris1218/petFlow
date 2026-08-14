@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession, requireStaffSession } from "@/lib/auth";
 import { BillingGate } from "@/components/dashboard/billing-gate";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
+import { DailyLogScheduler } from "@/components/dashboard/daily-log-scheduler";
 import { getBillingState } from "@/lib/billing";
 import { prisma } from "@/lib/prisma";
 
@@ -35,7 +36,10 @@ export default async function DashboardLayout({
         billingLabel={billing.menuLabel}
         billingExpired={billing.isExpired}
       >
-        <BillingGate expired={billing.isExpired}>{children}</BillingGate>
+        <BillingGate expired={billing.isExpired}>
+          <DailyLogScheduler />
+          {children}
+        </BillingGate>
       </DashboardSidebar>
     );
   } catch {

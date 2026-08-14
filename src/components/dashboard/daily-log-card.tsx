@@ -1,11 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { Camera, Clock, PawPrint, Send, Upload } from "lucide-react";
 import {
   createDailyLog,
-  flushDueDailyLogs,
   removeQueuedDailyLog,
   sendQueuedDailyLog,
 } from "@/actions/daily-logs";
@@ -84,16 +82,6 @@ export function DailyLogCard({ stays, queue }: DailyLogCardProps) {
   const cameraRef = useRef<HTMLInputElement>(null);
   const previewUrlRef = useRef<string | null>(null);
   const { success } = useFeedback();
-  const router = useRouter();
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      void flushDueDailyLogs().then((result) => {
-        if (result.sent > 0) router.refresh();
-      });
-    }, 30000);
-    return () => window.clearInterval(timer);
-  }, [router]);
 
   const selected = useMemo(
     () => stays.find((stay) => stay.bookingId === bookingId),
@@ -145,6 +133,10 @@ export function DailyLogCard({ stays, queue }: DailyLogCardProps) {
     formData.set("statusNote", statusNote);
     formData.set("scheduledDate", scheduledDate);
     formData.set("scheduledTime", scheduledTime);
+    formData.set(
+      "scheduledAt",
+      new Date(`${scheduledDate}T${scheduledTime}:00`).toISOString(),
+    );
     formData.set("photo", file);
 
     startTransition(async () => {
@@ -154,7 +146,11 @@ export function DailyLogCard({ stays, queue }: DailyLogCardProps) {
         setError(result.error);
         return;
       }
-      success("Foto na fila, aguardando envio.");
+      success(
+        result.sentNow
+          ? "Diário enviado no WhatsApp."
+          : "Foto na fila, vai sair no horário marcado.",
+      );
       resetFormKeepPet();
     });
   }

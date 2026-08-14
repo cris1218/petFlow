@@ -15,7 +15,11 @@ const ALLOWED_IMAGE_TYPES = new Set([
   "image/heic",
 ]);
 
-function scheduledAtFromParts(dateKey: string, time: string) {
+function scheduledAtFromParts(dateKey: string, time: string, iso?: string) {
+  if (iso) {
+    const fromIso = new Date(iso);
+    if (!Number.isNaN(fromIso.getTime())) return fromIso;
+  }
   const [hourRaw, minuteRaw] = time.split(":");
   const hour = Number(hourRaw);
   const minute = Number(minuteRaw);
@@ -43,6 +47,7 @@ export async function createDailyLog(formData: FormData) {
   const statusNote = String(formData.get("statusNote") ?? "").trim();
   const scheduledDate = String(formData.get("scheduledDate") ?? "");
   const scheduledTime = String(formData.get("scheduledTime") ?? "");
+  const scheduledIso = String(formData.get("scheduledAt") ?? "");
   const photo = formData.get("photo");
 
   if (!bookingId || !statusNote) {
@@ -52,7 +57,7 @@ export async function createDailyLog(formData: FormData) {
     };
   }
 
-  const scheduledAt = scheduledAtFromParts(scheduledDate, scheduledTime);
+  const scheduledAt = scheduledAtFromParts(scheduledDate, scheduledTime, scheduledIso);
   if (!scheduledAt) {
     return { ok: false as const, error: "Informe a data e o horário do envio." };
   }
@@ -105,6 +110,12 @@ export async function createDailyLog(formData: FormData) {
     },
   });
 
+  let sentNow = false;
+  if (scheduledAt.getTime() <= Date.now() + 10_000) {
+    const sent = await dispatchDailyLog(log.id);
+    sentNow = sent.ok;
+  }
+
   revalidatePath("/dashboard/daily-logs");
   revalidatePath("/dashboard");
 
@@ -113,6 +124,7 @@ export async function createDailyLog(formData: FormData) {
     logId: log.id,
     photoUrl,
     scheduledAt,
+    sentNow,
   };
 }
 
