@@ -226,8 +226,8 @@ export function SettingsForm({
       </SettingsSection>
 
       <SettingsSection
-        title="Serviços e preços"
-        description="Hotel, creche, petsitter e banho e tosa já vêm prontos. Ative o que vocês fazem e diga o preço."
+        title="O que vocês fazem"
+        description="Ligue o que o hotel oferece e coloque o valor. O que estiver desligado o cliente não vê na hora de agendar."
       >
         <HotelServicesForm initial={initial.services} />
       </SettingsSection>

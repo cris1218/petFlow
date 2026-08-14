@@ -102,6 +102,18 @@ async function sendBookingConfirmedWhatsApp(input: {
 }
 
 export async function createBooking(input: CreateBookingInput) {
+  try {
+    return await runCreateBooking(input);
+  } catch (error) {
+    console.error("[createBooking]", error);
+    return {
+      ok: false as const,
+      error: "Não foi possível enviar a reserva. Tente de novo.",
+    };
+  }
+}
+
+async function runCreateBooking(input: CreateBookingInput) {
   const parsed = createBookingSchema.safeParse(input);
 
   if (!parsed.success) {
@@ -336,7 +348,7 @@ export async function createBooking(input: CreateBookingInput) {
   }
 
   if (!requiresEntrada) {
-    await sendBookingConfirmedWhatsApp({
+    void sendBookingConfirmedWhatsApp({
       tenant,
       tutorName: booking.pet.tutor.name,
       tutorPhone: booking.pet.tutor.phone,

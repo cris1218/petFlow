@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { defaultWeekdays, type ServiceKind, type WeekdayHours } from "@/lib/schedule";
-import { cn, formatBRL } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 export type HotelServiceItem = {
   id: string;
@@ -35,6 +35,10 @@ function priceLabel(kind: ServiceKind) {
   return "Quanto custa a diária";
 }
 
+function FieldSlot({ children }: { children: React.ReactNode }) {
+  return <div className="min-w-[9rem] flex-1 space-y-1.5">{children}</div>;
+}
+
 function EntradaField({
   service,
   saveRow,
@@ -43,7 +47,7 @@ function EntradaField({
   saveRow: (service: HotelServiceItem, patch: Partial<HotelServiceItem>) => void;
 }) {
   return (
-    <div className="space-y-1.5">
+    <FieldSlot>
       <Label>Quanto o tutor paga agora</Label>
       <Input
         type="number"
@@ -59,6 +63,47 @@ function EntradaField({
           }
         }}
       />
+    </FieldSlot>
+  );
+}
+
+function ActiveSwitch({
+  service,
+  disabled,
+  onToggle,
+}: {
+  service: HotelServiceItem;
+  disabled: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="min-w-[7.5rem] shrink-0 space-y-1.5">
+      <Label>Ativo</Label>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={service.active}
+        disabled={disabled}
+        onClick={onToggle}
+        className="flex h-11 w-full items-center justify-between gap-3 rounded-md border px-3 text-sm"
+      >
+        <Badge variant={service.active ? "success" : "secondary"}>
+          {service.active ? "Ativo" : "Inativo"}
+        </Badge>
+        <span
+          className={cn(
+            "relative h-6 w-11 shrink-0 rounded-full transition-colors",
+            service.active ? "bg-accent" : "bg-muted",
+          )}
+        >
+          <span
+            className={cn(
+              "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all",
+              service.active ? "left-[22px]" : "left-0.5",
+            )}
+          />
+        </span>
+      </button>
     </div>
   );
 }
@@ -124,8 +169,8 @@ export function HotelServicesForm({
             </Badge>
           }
         >
-          <div className="grid gap-3 sm:grid-cols-[minmax(8rem,12rem)_auto] sm:items-end">
-            <div className="space-y-1.5">
+          <div className="flex flex-wrap items-end gap-3">
+            <FieldSlot>
               <Label>{priceLabel(service.kind)}</Label>
               <Input
                 type="number"
@@ -139,86 +184,59 @@ export function HotelServicesForm({
                   }
                 }}
               />
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={service.active}
-              disabled={isPending}
-              onClick={() => saveRow(service, { active: !service.active })}
-              className="flex h-11 w-full items-center justify-between gap-3 rounded-md border px-3 text-sm sm:w-auto"
-            >
-              <Badge variant={service.active ? "success" : "secondary"}>
-                {service.active ? "Ativo" : "Inativo"}
-              </Badge>
-              <span
-                className={cn(
-                  "relative h-6 w-11 shrink-0 rounded-full transition-colors",
-                  service.active ? "bg-accent" : "bg-muted",
-                )}
-              >
-                <span
-                  className={cn(
-                    "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all",
-                    service.active ? "left-[22px]" : "left-0.5",
-                  )}
-                />
-              </span>
-            </button>
-          </div>
+            </FieldSlot>
 
-          {service.kind === "STAY" ? (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <EntradaField service={service} saveRow={saveRow} />
-              <div className="space-y-1.5">
-                <Label>Até que horas a diária vale</Label>
-                <Input
-                  type="time"
-                  defaultValue={service.dailyCutoffTime || "12:00"}
-                  onBlur={(event) => {
-                    if (event.target.value !== service.dailyCutoffTime) {
-                      saveRow(service, { dailyCutoffTime: event.target.value });
-                    }
-                  }}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Quantos gatos no mesmo dia</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="200"
-                  defaultValue={String(service.catCapacity)}
-                  onBlur={(event) => {
-                    const next = Number(event.target.value);
-                    if (Number.isFinite(next) && next !== service.catCapacity) {
-                      saveRow(service, { catCapacity: next });
-                    }
-                  }}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Quantos cães no mesmo dia</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="200"
-                  defaultValue={String(service.dogCapacity)}
-                  onBlur={(event) => {
-                    const next = Number(event.target.value);
-                    if (Number.isFinite(next) && next !== service.dogCapacity) {
-                      saveRow(service, { dogCapacity: next });
-                    }
-                  }}
-                />
-              </div>
-            </div>
-          ) : null}
+            {service.kind === "STAY" ? (
+              <>
+                <EntradaField service={service} saveRow={saveRow} />
+                <FieldSlot>
+                  <Label>Até que horas a diária vale</Label>
+                  <Input
+                    type="time"
+                    defaultValue={service.dailyCutoffTime || "12:00"}
+                    onBlur={(event) => {
+                      if (event.target.value !== service.dailyCutoffTime) {
+                        saveRow(service, { dailyCutoffTime: event.target.value });
+                      }
+                    }}
+                  />
+                </FieldSlot>
+                <FieldSlot>
+                  <Label>Quantos gatos no mesmo dia</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="200"
+                    defaultValue={String(service.catCapacity)}
+                    onBlur={(event) => {
+                      const next = Number(event.target.value);
+                      if (Number.isFinite(next) && next !== service.catCapacity) {
+                        saveRow(service, { catCapacity: next });
+                      }
+                    }}
+                  />
+                </FieldSlot>
+                <FieldSlot>
+                  <Label>Quantos cães no mesmo dia</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="200"
+                    defaultValue={String(service.dogCapacity)}
+                    onBlur={(event) => {
+                      const next = Number(event.target.value);
+                      if (Number.isFinite(next) && next !== service.dogCapacity) {
+                        saveRow(service, { dogCapacity: next });
+                      }
+                    }}
+                  />
+                </FieldSlot>
+              </>
+            ) : null}
 
-          {service.kind === "DAYCARE" ? (
-            <div className="space-y-3">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5">
+            {service.kind === "DAYCARE" ? (
+              <>
+                <FieldSlot>
                   <Label>Quantos pets cabem no dia</Label>
                   <Input
                     type="number"
@@ -232,22 +250,14 @@ export function HotelServicesForm({
                       }
                     }}
                   />
-                </div>
+                </FieldSlot>
                 <EntradaField service={service} saveRow={saveRow} />
-              </div>
-              <WeekdayHoursEditor
-                weekdays={weekdayDrafts[service.id] ?? service.weekdays}
-                onChange={(weekdays) =>
-                  setWeekdayDrafts((current) => ({ ...current, [service.id]: weekdays }))
-                }
-              />
-            </div>
-          ) : null}
+              </>
+            ) : null}
 
-          {service.kind === "APPOINTMENT" ? (
-            <div className="space-y-3">
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <div className="space-y-1.5">
+            {service.kind === "APPOINTMENT" ? (
+              <>
+                <FieldSlot>
                   <Label>Quanto tempo dura cada atendimento</Label>
                   <Input
                     type="number"
@@ -262,8 +272,8 @@ export function HotelServicesForm({
                       }
                     }}
                   />
-                </div>
-                <div className="space-y-1.5">
+                </FieldSlot>
+                <FieldSlot>
                   <Label>Quantos pets no mesmo horário</Label>
                   <Input
                     type="number"
@@ -277,16 +287,34 @@ export function HotelServicesForm({
                       }
                     }}
                   />
-                </div>
+                </FieldSlot>
                 <EntradaField service={service} saveRow={saveRow} />
-              </div>
-              <WeekdayHoursEditor
-                weekdays={weekdayDrafts[service.id] ?? service.weekdays ?? defaultWeekdays()}
-                onChange={(weekdays) =>
-                  setWeekdayDrafts((current) => ({ ...current, [service.id]: weekdays }))
-                }
-              />
-            </div>
+              </>
+            ) : null}
+
+            <ActiveSwitch
+              service={service}
+              disabled={isPending}
+              onToggle={() => saveRow(service, { active: !service.active })}
+            />
+          </div>
+
+          {service.kind === "DAYCARE" ? (
+            <WeekdayHoursEditor
+              weekdays={weekdayDrafts[service.id] ?? service.weekdays}
+              onChange={(weekdays) =>
+                setWeekdayDrafts((current) => ({ ...current, [service.id]: weekdays }))
+              }
+            />
+          ) : null}
+
+          {service.kind === "APPOINTMENT" ? (
+            <WeekdayHoursEditor
+              weekdays={weekdayDrafts[service.id] ?? service.weekdays ?? defaultWeekdays()}
+              onChange={(weekdays) =>
+                setWeekdayDrafts((current) => ({ ...current, [service.id]: weekdays }))
+              }
+            />
           ) : null}
 
           {service.kind !== "STAY" ? (
@@ -309,15 +337,6 @@ export function HotelServicesForm({
       ))}
 
       {error && <p className="text-sm text-destructive">{error}</p>}
-      {services.some((service) => service.active) && (
-        <p className="text-xs text-muted-foreground">
-          O cliente vê na agenda:{" "}
-          {services
-            .filter((service) => service.active)
-            .map((service) => `${service.name} (${formatBRL(service.price)})`)
-            .join(" · ")}
-        </p>
-      )}
     </div>
   );
 }

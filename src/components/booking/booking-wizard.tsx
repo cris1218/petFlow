@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
 import {
@@ -47,12 +47,10 @@ import { CepInput } from "@/components/ui/cep-input";
 import { eachDateKey, effectiveServiceKind, toDateKey } from "@/lib/schedule";
 import { useFeedback } from "@/components/app-feedback";
 
-const STEPS = [
-  "Serviço e agenda",
-  "Tutor e pet",
-  "Pagamento",
-  "Confirmação",
-];
+const SERVICE_STEP = "Serviço e agenda";
+const TUTOR_STEP = "Tutor e pet";
+const PAYMENT_STEP = "Pagamento";
+const CONFIRM_STEP = "Confirmação";
 
 const FULL_CAPACITY_MESSAGE =
   "Está com a lotação máxima nesse período. Escolha outras datas.";
@@ -142,7 +140,7 @@ export function BookingWizard({
   const [missingVaccines, setMissingVaccines] = useState<string[]>([]);
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [submitting, setSubmitting] = useState(false);
   const { success } = useFeedback();
 
   const selectedService = services.find((service) => service.id === serviceId) ?? services[0];
@@ -155,6 +153,10 @@ export function BookingWizard({
   const todayKey = toDateKey(new Date());
   const cutoffTime = selectedService?.dailyCutoffTime || "12:00";
   const needsEntrada = Number(selectedService?.depositAmount ?? 0) > 0;
+  const wizardSteps = needsEntrada
+    ? [SERVICE_STEP, TUTOR_STEP, PAYMENT_STEP, CONFIRM_STEP]
+    : [SERVICE_STEP, TUTOR_STEP, CONFIRM_STEP];
+  const visibleStep = needsEntrada ? step : step >= 4 ? wizardSteps.length : step;
   const speciesAtCapacity = Boolean(
     stayInfo &&
       (isDaycare
@@ -376,6 +378,7 @@ export function BookingWizard({
   }
 
   function submitBooking() {
+    if (submitting) return;
     if (!selectedService) {
       setError("Este hotel ainda não tem serviços ativos.");
       return;
@@ -419,62 +422,69 @@ export function BookingWizard({
       return;
     }
 
-    startTransition(async () => {
+    void (async () => {
+      setSubmitting(true);
       setError(null);
-      const result = await createBooking({
-        tenantSlug,
-        serviceId: service.id,
-        startDate: `${startDate}T12:00:00`,
-        endDate: `${isAppointment ? startDate : endDate}T12:00:00`,
-        slotTime: isAppointment ? slotTime : undefined,
-        checkoutTime: isHotel ? checkoutTime : undefined,
-        tutor: {
-          name: tutor.name,
-          phone: tutor.phone,
-          cpf: tutor.cpf,
-          address: formatFullAddress(address),
-          pix: pixEnabled && needsEntrada
-            ? {
-                kind: pixKind,
-                key:
-                  pixKind === "CPF"
-                    ? pixKey || tutor.cpf
-                    : pixKind === "PHONE"
-                      ? pixKey || tutor.phone
-                      : pixKey,
-              }
-            : undefined,
-        },
-        pet: {
-          name: pet.name,
-          species: pet.species,
-          breed: pet.breed,
-          size: pet.size,
-          notes: pet.notes,
-          castrated: hasPetCareProfile(pet.species) ? Boolean(pet.castrated) : undefined,
-          vaccinated: hasPetCareProfile(pet.species) ? Boolean(pet.vaccinated) : undefined,
-          aggressive: hasPetCareProfile(pet.species) ? Boolean(pet.aggressive) : undefined,
-        },
-        vaccines: hasVaccines.map((name) => ({ name })),
-      });
+      try {
+        const result = await createBooking({
+          tenantSlug,
+          serviceId: service.id,
+          startDate: `${startDate}T12:00:00`,
+          endDate: `${isAppointment ? startDate : endDate}T12:00:00`,
+          slotTime: isAppointment ? slotTime : undefined,
+          checkoutTime: isHotel ? checkoutTime : undefined,
+          tutor: {
+            name: tutor.name,
+            phone: tutor.phone,
+            cpf: tutor.cpf,
+            address: formatFullAddress(address),
+            pix: pixEnabled && needsEntrada
+              ? {
+                  kind: pixKind,
+                  key:
+                    pixKind === "CPF"
+                      ? pixKey || tutor.cpf
+                      : pixKind === "PHONE"
+                        ? pixKey || tutor.phone
+                        : pixKey,
+                }
+              : undefined,
+          },
+          pet: {
+            name: pet.name,
+            species: pet.species,
+            breed: pet.breed,
+            size: pet.size,
+            notes: pet.notes,
+            castrated: hasPetCareProfile(pet.species) ? Boolean(pet.castrated) : undefined,
+            vaccinated: hasPetCareProfile(pet.species) ? Boolean(pet.vaccinated) : undefined,
+            aggressive: hasPetCareProfile(pet.species) ? Boolean(pet.aggressive) : undefined,
+          },
+          vaccines: hasVaccines.map((name) => ({ name })),
+        });
 
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
 
-      setBookingId(result.bookingId);
-      setPix(result.pix);
-      setMissingVaccines(result.missingVaccines);
-      if (result.confirmed) {
-        setConfirmed(true);
-        setStep(4);
-        success("Reserva confirmada com sucesso.");
-        return;
+        setBookingId(result.bookingId);
+        setPix(result.pix);
+        setMissingVaccines(result.missingVaccines);
+        if (result.confirmed) {
+          setConfirmed(true);
+          setStep(4);
+          success("Reserva confirmada com sucesso.");
+          return;
+        }
+        setStep(3);
+        success("Reserva enviada com sucesso.");
+      } catch {
+        setError("Não foi possível enviar a reserva. Tente de novo.");
+      } finally {
+        setSubmitting(false);
       }
-      setStep(3);
-      success("Reserva enviada com sucesso.");
-    });
+    })();
   }
 
   return (
@@ -485,13 +495,19 @@ export function BookingWizard({
           Agendar em {tenantName}
         </CardTitle>
         <CardDescription>
-          Passo {step} de 4 · {STEPS[step - 1]}
+          Passo {visibleStep} de {wizardSteps.length} · {wizardSteps[visibleStep - 1]}
         </CardDescription>
-        <div className="grid grid-cols-4 gap-2 pt-2">
-          {STEPS.map((label, index) => (
+        <div
+          className={`grid gap-2 pt-2 ${
+            wizardSteps.length === 4 ? "grid-cols-4" : "grid-cols-3"
+          }`}
+        >
+          {wizardSteps.map((label, index) => (
             <div
               key={label}
-              className={`h-1.5 rounded-full ${index < step ? "bg-primary" : "bg-muted"}`}
+              className={`h-1.5 rounded-full ${
+                index < visibleStep ? "bg-primary" : "bg-muted"
+              }`}
             />
           ))}
         </div>
@@ -504,19 +520,29 @@ export function BookingWizard({
                 Este estabelecimento ainda não cadastrou serviços ativos.
               </p>
             ) : (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div
+                className={`grid gap-3 ${
+                  services.length <= 1
+                    ? "grid-cols-1"
+                    : services.length === 2
+                      ? "grid-cols-2"
+                      : services.length === 3
+                        ? "grid-cols-1 sm:grid-cols-3"
+                        : "grid-cols-2 sm:grid-cols-4"
+                }`}
+              >
                 {services.map((service) => (
                   <button
                     key={service.id}
                     type="button"
                     onClick={() => setServiceId(service.id)}
-                    className={`rounded-xl border p-4 text-left ${
+                    className={`min-w-0 rounded-xl border p-4 text-left ${
                       serviceId === service.id
                         ? "border-primary bg-primary/5"
                         : "hover:bg-muted"
                     }`}
                   >
-                    <p className="font-semibold">{service.name}</p>
+                    <p className="font-semibold leading-tight">{service.name}</p>
                     <p className="text-sm text-muted-foreground">
                       {formatBRL(service.price)}
                       {service.kind === "APPOINTMENT"
@@ -951,8 +977,8 @@ export function BookingWizard({
               <Button variant="outline" className="w-full sm:w-auto" onClick={() => setStep(1)}>
                 Voltar
               </Button>
-              <Button className="w-full sm:w-auto" onClick={submitBooking} loading={isPending}>
-                {isPending
+              <Button className="w-full sm:w-auto" onClick={submitBooking} loading={submitting}>
+                {submitting
                   ? "Enviando..."
                   : pixEnabled && needsEntrada
                     ? "Gerar PIX da entrada"

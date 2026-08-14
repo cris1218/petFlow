@@ -4,7 +4,7 @@ import { BookingWizard } from "@/components/booking/booking-wizard";
 import { BrandMark } from "@/components/brand-mark";
 import { petPolicyFromTenant } from "@/lib/constants";
 import { isMercadoPagoConfigured } from "@/lib/mercadopago";
-import { ensureTenantServices, serializeTenantService } from "@/lib/services";
+import { ensureTenantServices, FIXED_SERVICES, serializeTenantService } from "@/lib/services";
 import { ensureTenantSchedule } from "@/lib/tenant-schedule";
 import { prisma } from "@/lib/prisma";
 
@@ -25,7 +25,11 @@ export default async function PublicBookingPage({
   await ensureTenantSchedule(tenant.id);
   const [services, requiredVaccines] = await Promise.all([
     prisma.tenantService.findMany({
-      where: { tenantId: tenant.id, active: true },
+      where: {
+        tenantId: tenant.id,
+        active: true,
+        name: { in: FIXED_SERVICES.map((service) => service.name) },
+      },
       include: { weekdays: true },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     }),

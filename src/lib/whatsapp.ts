@@ -92,6 +92,7 @@ async function evolutionRequest(path: string, init?: RequestInit): Promise<Evolu
   try {
     response = await fetch(`${evolutionUrl()}${path}`, {
       ...init,
+      signal: init?.signal ?? AbortSignal.timeout(5000),
       headers: {
         "Content-Type": "application/json",
         apikey: evolutionKey(),

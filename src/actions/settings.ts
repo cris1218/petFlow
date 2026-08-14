@@ -13,7 +13,6 @@ import {
 import {
   TIME_PATTERN,
   WEEKDAY_ORDER,
-  defaultWeekdays,
   isTimedService,
   type WeekdayHours,
 } from "@/lib/schedule";

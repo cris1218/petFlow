@@ -1,12 +1,6 @@
 export const SERVICE_KINDS = ["STAY", "DAYCARE", "APPOINTMENT"] as const;
 export type ServiceKind = (typeof SERVICE_KINDS)[number];
 
-export const SERVICE_KIND_LABELS: Record<ServiceKind, string> = {
-  STAY: "Hotel",
-  DAYCARE: "Creche / Petsitter",
-  APPOINTMENT: "Banho e tosa",
-};
-
 export function isTimedService(kind: ServiceKind) {
   return kind === "DAYCARE" || kind === "APPOINTMENT";
 }

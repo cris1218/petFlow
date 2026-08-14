@@ -54,8 +54,9 @@ async function main() {
     await prisma.tenantService.createMany({
       data: [
         { tenantId: tenant.id, name: "Hotel", price: 80, sortOrder: 0, active: true, kind: "STAY" },
-        { tenantId: tenant.id, name: "Creche", price: 50, sortOrder: 1, active: true, kind: "DAYCARE" },
-        { tenantId: tenant.id, name: "Banho e tosa", price: 70, sortOrder: 2, active: true, kind: "APPOINTMENT" },
+        { tenantId: tenant.id, name: "Creche / diária", price: 50, sortOrder: 1, active: true, kind: "DAYCARE" },
+        { tenantId: tenant.id, name: "Petsitter", price: 50, sortOrder: 2, active: true, kind: "DAYCARE" },
+        { tenantId: tenant.id, name: "Banho e tosa", price: 70, sortOrder: 3, active: true, kind: "APPOINTMENT" },
       ],
     });
   } else {
