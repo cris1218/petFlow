@@ -10,7 +10,6 @@ type ConfirmationInput = {
 };
 
 type DailyLogInput = {
-  photoUrl: string;
   statusNote: string;
 };
 
@@ -23,8 +22,8 @@ export const whatsappTemplates = {
   confirmation({ tutorName, petName, startDate, endDate, slotTime }: ConfirmationInput) {
     return `Olá ${tutorName}! A reserva do ${petName} (${formatBookingWhen(startDate, endDate, slotTime)}) foi CONFIRMADA! 🐾`;
   },
-  dailyLog({ photoUrl, statusNote }: DailyLogInput) {
-    return `Olha quem está se divertindo! 📸 ${photoUrl} - Status: ${statusNote}`;
+  dailyLog({ statusNote }: DailyLogInput) {
+    return `Olha quem está se divertindo! 📸\n${statusNote}`;
   },
   reminder({ tutorName, petName }: ReminderInput) {
     return `Oi ${tutorName}! Amanhã recebemos o ${petName}. Não esqueça da ração e da carteira de vacinas!`;
@@ -274,15 +273,20 @@ export async function sendWhatsAppText(input: {
 export async function sendWhatsAppImage(input: {
   instanceName: string;
   phone: string;
-  imageUrl: string;
+  media: string;
   caption: string;
+  mimetype?: string;
+  fileName?: string;
 }) {
   return evolutionFetch(`/message/sendMedia/${input.instanceName}`, {
     method: "POST",
+    signal: AbortSignal.timeout(25000),
     body: JSON.stringify({
       number: toWhatsAppNumber(input.phone),
       mediatype: "image",
-      media: input.imageUrl,
+      mimetype: input.mimetype ?? "image/jpeg",
+      fileName: input.fileName ?? "foto.jpg",
+      media: input.media,
       caption: input.caption,
     }),
   });

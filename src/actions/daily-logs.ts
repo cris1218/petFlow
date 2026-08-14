@@ -18,6 +18,30 @@ const ALLOWED_IMAGE_TYPES = new Set([
   "image/heic",
 ]);
 
+async function imageUrlToWhatsAppMedia(url: string) {
+  const fallback = {
+    dataUri: url,
+    mimetype: "image/jpeg",
+    fileName: "diario.jpg",
+  };
+
+  try {
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) return fallback;
+    const mime = response.headers.get("content-type")?.split(";")[0] || "image/jpeg";
+    const bytes = Buffer.from(await response.arrayBuffer());
+    const ext = mime.includes("png") ? "png" : mime.includes("webp") ? "webp" : "jpg";
+    return {
+      dataUri: `data:${mime};base64,${bytes.toString("base64")}`,
+      mimetype: mime.startsWith("image/") ? mime : "image/jpeg",
+      fileName: `diario.${ext}`,
+    };
+  } catch (error) {
+    console.error("[daily-log] fetch photo", error);
+    return fallback;
+  }
+}
+
 export async function createDailyLog(formData: FormData) {
   const { tenantId, user } = await requireStaffSession();
 
@@ -79,30 +103,47 @@ export async function createDailyLog(formData: FormData) {
     },
   });
 
-  const caption = whatsappTemplates.dailyLog({ photoUrl, statusNote });
+  const caption = whatsappTemplates.dailyLog({ statusNote });
   const instanceName =
     user.tenant.whatsappInstanceName ?? `petflow_${user.tenant.slug}`;
   const phone = booking.pet.tutor.phone;
+  const media = await imageUrlToWhatsAppMedia(photoUrl);
 
   let sentToWhatsApp = false;
   try {
     await sendWhatsAppImage({
       instanceName,
       phone,
-      imageUrl: photoUrl,
+      media: media.dataUri,
+      mimetype: media.mimetype,
+      fileName: media.fileName,
       caption,
     });
     sentToWhatsApp = true;
-  } catch {
+  } catch (error) {
+    console.error("[daily-log] whatsapp image", error);
     try {
-      await sendWhatsAppText({
+      await sendWhatsAppImage({
         instanceName,
         phone,
-        text: caption,
+        media: photoUrl,
+        mimetype: media.mimetype,
+        fileName: media.fileName,
+        caption,
       });
       sentToWhatsApp = true;
-    } catch (error) {
-      console.error("[daily-log] whatsapp failed", error);
+    } catch (urlError) {
+      console.error("[daily-log] whatsapp image url", urlError);
+      try {
+        await sendWhatsAppText({
+          instanceName,
+          phone,
+          text: caption,
+        });
+        sentToWhatsApp = true;
+      } catch (textError) {
+        console.error("[daily-log] whatsapp failed", textError);
+      }
     }
   }
 
