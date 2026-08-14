@@ -2,13 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { addDays, startOfDay, endOfDay } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppText, whatsappTemplates } from "@/lib/whatsapp";
-import { processDueDailyLogs } from "@/lib/daily-log-dispatch";
 import { slugify } from "@/lib/utils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
+  return handleCron(request);
+}
+
+export async function POST(request: NextRequest) {
+  return handleCron(request);
+}
+
+async function handleCron(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
   const auth = request.headers.get("authorization");
 
@@ -59,10 +66,9 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const result = await processDueDailyLogs();
   return NextResponse.json({
     ok: true,
-    reminders: { candidates: bookings.length, sent },
-    dailyLogs: result,
+    candidates: bookings.length,
+    sent,
   });
 }

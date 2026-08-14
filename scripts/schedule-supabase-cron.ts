@@ -3,6 +3,11 @@ import { readEnv } from "@/lib/env";
 import fs from "node:fs";
 import path from "node:path";
 
+const JOBS = [
+  { name: "petflow-daily-logs", schedule: "* * * * *", path: "/api/cron/daily-logs" },
+  { name: "petflow-reminders", schedule: "0 12 * * *", path: "/api/cron/reminders" },
+] as const;
+
 function readLocalEnv(key: string) {
   const fromEnv = readEnv(key);
   if (fromEnv) return fromEnv;
@@ -52,7 +57,6 @@ async function main() {
     );
   }
 
-  const endpoint = `${appUrl}/api/cron/daily-logs`;
   const prisma = new PrismaClient({
     datasources: { db: { url: directUrl } },
   });
@@ -63,28 +67,28 @@ async function main() {
     );
     await prisma.$executeRawUnsafe(`create extension if not exists pg_net`);
 
-    await prisma.$executeRawUnsafe(`
-      do $$
-      declare
-        existing integer;
-      begin
-        select jobid into existing from cron.job where jobname = 'petflow-daily-logs';
-        if existing is not null then
-          perform cron.unschedule(existing);
-        end if;
-      end $$;
-    `);
+    for (const job of JOBS) {
+      const endpoint = `${appUrl}${job.path}`;
+      await prisma.$executeRawUnsafe(`
+        do $$
+        declare
+          existing integer;
+        begin
+          select jobid into existing from cron.job where jobname = '${sqlString(job.name)}';
+          if existing is not null then
+            perform cron.unschedule(existing);
+          end if;
+        end $$;
+      `);
 
-    const command = `select net.http_get(url := '${sqlString(endpoint)}', headers := jsonb_build_object('Authorization', 'Bearer ${sqlString(secret)}', 'Content-Type', 'application/json'), timeout_milliseconds := 15000)`;
+      const command = `select net.http_get(url := '${sqlString(endpoint)}', headers := jsonb_build_object('Authorization', 'Bearer ${sqlString(secret)}', 'Content-Type', 'application/json'), timeout_milliseconds := 15000)`;
 
-    await prisma.$queryRawUnsafe(
-      `select cron.schedule('petflow-daily-logs', '* * * * *', '${sqlString(command)}')`,
-    );
+      await prisma.$queryRawUnsafe(
+        `select cron.schedule('${sqlString(job.name)}', '${job.schedule}', '${sqlString(command)}')`,
+      );
 
-    const jobs = await prisma.$queryRawUnsafe<Array<{ jobname: string; schedule: string; command: string }>>(
-      `select jobname, schedule, command from cron.job where jobname = 'petflow-daily-logs'`,
-    );
-    console.log("Cron do Supabase ativo:", jobs[0]?.schedule, "→", endpoint);
+      console.log("Cron do Supabase ativo:", job.name, job.schedule, "→", endpoint);
+    }
   } finally {
     await prisma.$disconnect();
   }
