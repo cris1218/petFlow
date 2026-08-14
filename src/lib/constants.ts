@@ -11,6 +11,15 @@ export const QUICK_STATUS_NOTES = [
   "Descansando no quarto",
 ] as const;
 
+export const DAILY_LOG_CAPTIONS: Record<(typeof QUICK_STATUS_NOTES)[number], string> = {
+  "Já almoçou": "Olha quem já almoçou e está de barriguinha cheia! 🍽️",
+  "Brincando no jardim": "Olha quem está se divertindo no jardim! 🌿",
+  "Hora da soneca": "Olha quem tá tirando uma sonequinha 😴",
+  "Passeio no parque": "Olha quem saiu para passear no parque! 🐾",
+  "Hora do banho": "Olha quem está na hora do banho! 🛁",
+  "Descansando no quarto": "Olha quem está descansando no quartinho 🛏️",
+};
+
 export const SPECIES_LABELS = {
   DOG: "Cão",
   CAT: "Gato",

@@ -1,3 +1,4 @@
+import { DAILY_LOG_CAPTIONS } from "@/lib/constants";
 import { formatBookingWhen, toWhatsAppNumber } from "@/lib/utils";
 import { readEnv } from "@/lib/env";
 
@@ -23,7 +24,9 @@ export const whatsappTemplates = {
     return `Olá ${tutorName}! A reserva do ${petName} (${formatBookingWhen(startDate, endDate, slotTime)}) foi CONFIRMADA! 🐾`;
   },
   dailyLog({ statusNote }: DailyLogInput) {
-    return `Olha quem está se divertindo! 📸\n${statusNote}`;
+    const caption =
+      DAILY_LOG_CAPTIONS[statusNote as keyof typeof DAILY_LOG_CAPTIONS];
+    return caption ?? `Olha quem está se divertindo! 📸\n${statusNote}`;
   },
   reminder({ tutorName, petName }: ReminderInput) {
     return `Oi ${tutorName}! Amanhã recebemos o ${petName}. Não esqueça da ração e da carteira de vacinas!`;
