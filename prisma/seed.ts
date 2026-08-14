@@ -94,7 +94,7 @@ async function main() {
     await prisma.user.create({
       data: {
         tenantId: null,
-        name: "Master PetFlow",
+        name: "Master Hospeo",
         email: masterEmail,
         passwordHash: await bcrypt.hash(
           process.env.MASTER_PASSWORD || "altere-esta-senha",

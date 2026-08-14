@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireMasterSession, requireStaffSession } from "@/lib/auth";
+import { APP_NAME } from "@/lib/constants";
 
 function preview(body: string) {
   const text = body.trim().replace(/\s+/g, " ");
@@ -142,7 +143,7 @@ export async function listHotelSupportTickets() {
     updatedAt: ticket.updatedAt,
     lastMessage: ticket.messages[0] ? preview(ticket.messages[0].body) : "",
     openedByMaster: ticket.author.role === "MASTER",
-    authorName: ticket.author.role === "MASTER" ? "PetFlow" : ticket.author.name,
+    authorName: ticket.author.role === "MASTER" ? APP_NAME : ticket.author.name,
   }));
 }
 

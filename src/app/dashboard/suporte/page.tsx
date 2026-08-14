@@ -3,6 +3,7 @@ import { listHotelSupportTickets } from "@/actions/support";
 import { CreateTicketForm } from "@/components/support/create-ticket-form";
 import { TicketStatusBadge } from "@/components/support/ticket-status-badge";
 import { formatDateTime } from "@/lib/utils";
+import { APP_NAME } from "@/lib/constants";
 
 export default async function HotelSupportPage() {
   const tickets = await listHotelSupportTickets();
@@ -12,7 +13,7 @@ export default async function HotelSupportPage() {
       <div>
         <h1 className="text-xl font-semibold sm:text-2xl">Suporte</h1>
         <p className="text-sm text-muted-foreground">
-          Abra um chamado para o master do PetFlow. Chamados que o master enviar
+          Abra um chamado para o master do {APP_NAME}. Chamados que o master enviar
           ao hotel também aparecem aqui.
         </p>
       </div>

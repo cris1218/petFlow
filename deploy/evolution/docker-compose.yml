@@ -36,7 +36,7 @@ services:
       CACHE_REDIS_ENABLED: "true"
       CACHE_REDIS_URI: redis://evolution-redis:6379/1
       CACHE_LOCAL_ENABLED: "false"
-      CONFIG_SESSION_PHONE_CLIENT: PetFlow
+      CONFIG_SESSION_PHONE_CLIENT: Hospeo
       CONFIG_SESSION_PHONE_NAME: Chrome
       QRCODE_LIMIT: "30"
       DEL_INSTANCE: "false"

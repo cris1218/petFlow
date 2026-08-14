@@ -1,4 +1,4 @@
-export const APP_NAME = "PetFlow";
+export const APP_NAME = "Hospeo";
 export const APP_SLOGAN =
   "Hospedagem, agendamentos e diário de bordo direto no WhatsApp.";
 

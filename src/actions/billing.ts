@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireMasterSession, requireStaffSession } from "@/lib/auth";
 import { getBillingState, nextPaidUntil } from "@/lib/billing";
+import { APP_NAME } from "@/lib/constants";
 import {
   createPixPayment,
   getMercadoPagoPayment,
@@ -258,7 +259,7 @@ export async function createSubscriptionPix() {
     const pix = await createPixPayment({
       accessToken: token,
       amount,
-      description: `PetFlow — ${user.tenant.name} — 30 dias`,
+      description: `${APP_NAME} — ${user.tenant.name} — 30 dias`,
       payerEmail: user.email,
       externalReference: subscriptionExternalRef(payment.id),
     });

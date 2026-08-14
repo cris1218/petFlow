@@ -1,4 +1,4 @@
--- PetFlow usa Prisma no servidor (role postgres), não a Data API.
+-- Hospeo usa Prisma no servidor (role postgres), não a Data API.
 -- Sem RLS, a chave publishable conseguiria ler/gravar tudo via REST.
 -- Com RLS ligado e sem policies para anon/authenticated, a API fica bloqueada.
 -- O Prisma continua com acesso total (owner do banco, bypass de RLS).

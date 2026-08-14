@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createSupportTicket } from "@/actions/support";
 import { useFeedback } from "@/components/app-feedback";
+import { APP_NAME } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,7 +29,7 @@ export function CreateTicketForm() {
       <CardHeader>
         <CardTitle>Novo pedido</CardTitle>
         <CardDescription>
-          Abra um chamado para o master do PetFlow. Gestor e equipe veem as
+          Abra um chamado para o master do {APP_NAME}. Gestor e equipe veem as
           respostas aqui.
         </CardDescription>
       </CardHeader>

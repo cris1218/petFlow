@@ -5,6 +5,7 @@ import { TicketReplyForm } from "@/components/support/ticket-reply-form";
 import { TicketStatusBadge } from "@/components/support/ticket-status-badge";
 import { TicketThread } from "@/components/support/ticket-thread";
 import { formatDateTime } from "@/lib/utils";
+import { APP_NAME } from "@/lib/constants";
 
 export default async function HotelSupportTicketPage({
   params,
@@ -33,7 +34,7 @@ export default async function HotelSupportTicketPage({
             <p className="text-sm text-muted-foreground">
               Aberto{" "}
               {ticket.author.role === "MASTER"
-                ? "pelo master PetFlow"
+                ? `pelo master ${APP_NAME}`
                 : `por ${ticket.author.name}`}{" "}
               em {formatDateTime(ticket.createdAt)}
             </p>

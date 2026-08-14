@@ -10,7 +10,7 @@ import { requireStaffSession } from "@/lib/auth";
 import { assertOwnedBooking } from "@/lib/tenant";
 import { sendWhatsAppText, whatsappTemplates } from "@/lib/whatsapp";
 import { eachDateKey, effectiveServiceKind, toDateKey } from "@/lib/schedule";
-import { petPolicyFromTenant, hasPetCareProfile, sizesForSpecies } from "@/lib/constants";
+import { petPolicyFromTenant, hasPetCareProfile, sizesForSpecies, APP_NAME } from "@/lib/constants";
 import { assertSlotAvailable } from "@/lib/tenant-schedule";
 import { cpfDigits, phoneDigits, pixPayerEmail } from "@/lib/utils";
 
@@ -329,7 +329,7 @@ async function runCreateBooking(input: CreateBookingInput) {
         accessToken,
         bookingId: booking.id,
         amount: pricing.depositAmount,
-        description: `Entrada PetFlow · ${service.name} · ${booking.pet.name}`,
+        description: `Entrada ${APP_NAME} · ${service.name} · ${booking.pet.name}`,
         payerEmail:
           pixPayer && pixPayer.ok
             ? pixPayer.email

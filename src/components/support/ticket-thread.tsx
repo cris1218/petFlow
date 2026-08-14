@@ -1,5 +1,6 @@
 import { formatDateTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { APP_NAME } from "@/lib/constants";
 
 export function TicketThread({
   messages,
@@ -25,7 +26,7 @@ export function TicketThread({
           )}
         >
           <p className="text-xs font-medium text-muted-foreground">
-            {message.fromMaster ? "Suporte PetFlow" : message.author.name} ·{" "}
+            {message.fromMaster ? `Suporte ${APP_NAME}` : message.author.name} ·{" "}
             {formatDateTime(message.createdAt)}
           </p>
           <p className="mt-1 whitespace-pre-wrap text-sm">{message.body}</p>

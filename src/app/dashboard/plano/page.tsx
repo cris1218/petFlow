@@ -1,5 +1,6 @@
 import { getHotelBillingOverview } from "@/actions/billing";
 import { PlanPix } from "@/components/dashboard/plan-pix";
+import { APP_NAME } from "@/lib/constants";
 
 export default async function PlanPage() {
   const overview = await getHotelBillingOverview();
@@ -9,7 +10,7 @@ export default async function PlanPage() {
       <div>
         <h1 className="text-xl font-semibold sm:text-2xl">Plano</h1>
         <p className="text-sm text-muted-foreground">
-          Pague o PIX do valor atual para continuar usando o PetFlow. Cada
+          Pague o PIX do valor atual para continuar usando o {APP_NAME}. Cada
           pagamento confirmado libera mais 30 dias.
         </p>
       </div>

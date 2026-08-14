@@ -19,6 +19,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/ui/password-input";
 import { MercadoPagoSetupGuide } from "@/components/mercadopago-setup-guide";
+import { APP_NAME } from "@/lib/constants";
 
 export function PlatformMpForm({
   pixConfigured,
@@ -46,7 +47,7 @@ export function PlatformMpForm({
           </Badge>
         </div>
         <CardDescription>
-          Conta que recebe o PIX dos hotéis para renovar o plano. O PetFlow não
+          Conta que recebe o PIX dos hotéis para renovar o plano. O {APP_NAME} não
           mostra o token depois de salvo.
         </CardDescription>
       </CardHeader>

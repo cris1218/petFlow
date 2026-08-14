@@ -3,6 +3,7 @@
 import { Copy, ExternalLink } from "lucide-react";
 import { useFeedback } from "@/components/app-feedback";
 import { Button } from "@/components/ui/button";
+import { APP_NAME } from "@/lib/constants";
 
 const PANEL_URL = "https://www.mercadopago.com.br/developers/panel/app";
 
@@ -50,7 +51,7 @@ export function MercadoPagoSetupGuide({
           e clique em <strong>Criar aplicação</strong>.
         </Step>
         <Step n={3}>
-          Dê um nome (ex.: PetFlow), escolha produto de{" "}
+          Dê um nome (ex.: {APP_NAME}), escolha produto de{" "}
           <strong>pagamentos online</strong> (Checkout Transparente / API) e
           salve.
         </Step>
@@ -60,7 +61,7 @@ export function MercadoPagoSetupGuide({
           <span className="font-mono">APP_USR-</span>.
         </Step>
         <Step n={5}>
-          Cole o token no campo abaixo e salve aqui no PetFlow.
+          Cole o token no campo abaixo e salve aqui no {APP_NAME}.
         </Step>
         <Step n={6}>
           Na mesma aplicação, vá em{" "}
