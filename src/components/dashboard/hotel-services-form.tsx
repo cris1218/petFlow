@@ -12,12 +12,21 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { SERVICE_KIND_LABELS, type ServiceKind } from "@/lib/schedule";
 import { cn, formatBRL } from "@/lib/utils";
 
 export type HotelServiceItem = {
   id: string;
   name: string;
   price: number;
+  kind: ServiceKind;
   active: boolean;
 };
 
@@ -29,6 +38,7 @@ export function HotelServicesForm({
   const [services, setServices] = useState(initial);
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
+  const [kind, setKind] = useState<ServiceKind>("STAY");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const { success, error: toastError } = useFeedback();
@@ -39,6 +49,7 @@ export function HotelServicesForm({
       const result = await createTenantService({
         name,
         price: Number(price),
+        kind,
       });
       if (!result.ok) {
         setError(result.error);
@@ -48,6 +59,7 @@ export function HotelServicesForm({
       setServices((current) => [...current, result.service]);
       setName("");
       setPrice("");
+      setKind("STAY");
       success("Serviço cadastrado.");
     });
   }
@@ -60,6 +72,7 @@ export function HotelServicesForm({
         name: patch.name ?? service.name,
         price: patch.price ?? service.price,
         active: patch.active ?? service.active,
+        kind: patch.kind ?? service.kind,
       });
       if (!result.ok) {
         setError(result.error);
@@ -99,7 +112,7 @@ export function HotelServicesForm({
         {services.map((service) => (
           <div
             key={service.id}
-            className="grid gap-3 rounded-xl border p-3 sm:grid-cols-[1fr_8rem_auto_auto] sm:items-end"
+            className="grid gap-3 rounded-xl border p-3 sm:grid-cols-[1fr_8rem_minmax(11rem,auto)_auto_auto] sm:items-end"
           >
             <div className="space-y-1.5">
               <Label>Serviço</Label>
@@ -114,7 +127,7 @@ export function HotelServicesForm({
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Valor / diária</Label>
+              <Label>{service.kind === "APPOINTMENT" ? "Valor" : "Valor / diária"}</Label>
               <Input
                 type="number"
                 min="1"
@@ -127,6 +140,26 @@ export function HotelServicesForm({
                   }
                 }}
               />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Agenda</Label>
+              <Select
+                value={service.kind}
+                onValueChange={(value) =>
+                  saveRow(service, { kind: value as ServiceKind })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(SERVICE_KIND_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <button
               type="button"
@@ -167,7 +200,7 @@ export function HotelServicesForm({
         ))}
       </div>
 
-      <div className="grid gap-3 rounded-xl border border-dashed p-3 sm:grid-cols-[1fr_8rem_auto] sm:items-end">
+      <div className="grid gap-3 rounded-xl border border-dashed p-3 sm:grid-cols-[1fr_8rem_minmax(11rem,auto)_auto] sm:items-end">
         <div className="space-y-1.5">
           <Label htmlFor="new-service">Novo serviço</Label>
           <Input
@@ -188,6 +221,21 @@ export function HotelServicesForm({
             onChange={(event) => setPrice(event.target.value)}
             placeholder="80"
           />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Agenda</Label>
+          <Select value={kind} onValueChange={(value) => setKind(value as ServiceKind)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(SERVICE_KIND_LABELS).map(([value, label]) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <Button type="button" className="w-full sm:w-auto" loading={isPending} onClick={addService}>
           <Plus className="h-4 w-4" />

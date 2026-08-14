@@ -31,6 +31,7 @@ export default async function DashboardLayout({
       <DashboardSidebar
         tenantName={user.tenant.name}
         role={user.role}
+        logoUrl={user.tenant.logoUrl}
         billingLabel={billing.menuLabel}
         billingExpired={billing.isExpired}
       >

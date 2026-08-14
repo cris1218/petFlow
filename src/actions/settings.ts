@@ -11,6 +11,7 @@ import {
 } from "@/lib/services";
 import { inferServiceKind, type ServiceKind } from "@/lib/schedule";
 import { ensureTenantSchedule, getTenantScheduleConfig } from "@/lib/tenant-schedule";
+import { phoneDigits } from "@/lib/utils";
 
 function revalidateHotel(slug: string) {
   revalidatePath("/dashboard/configuracoes");
@@ -43,10 +44,15 @@ export async function getTenantSettings() {
 
 export async function saveHotelWhatsApp(whatsappNumber: string) {
   const { tenantId, user } = await requireHotelAdminSession();
+  const digits = phoneDigits(whatsappNumber);
+
+  if (digits && digits.length < 10) {
+    return { ok: false as const, error: "Informe um WhatsApp válido." };
+  }
 
   await prisma.tenant.update({
     where: { id: tenantId },
-    data: { whatsappNumber: whatsappNumber.trim() || null },
+    data: { whatsappNumber: digits || null },
   });
 
   revalidateHotel(user.tenant.slug);
@@ -193,11 +199,11 @@ export async function uploadHotelLogoAction(formData: FormData) {
   if (!(file instanceof File) || file.size === 0) {
     return { ok: false as const, error: "Escolha uma imagem do logo." };
   }
-  if (file.size > 4 * 1024 * 1024) {
-    return { ok: false as const, error: "O logo deve ter no máximo 4 MB." };
+  if (file.size > 2 * 1024 * 1024) {
+    return { ok: false as const, error: "O logo deve ter no máximo 2 MB." };
   }
   if (file.type && !ALLOWED_LOGO_TYPES.has(file.type)) {
-    return { ok: false as const, error: "Use uma imagem JPG, PNG ou WEBP." };
+    return { ok: false as const, error: "Use PNG (fundo transparente), WEBP ou JPG." };
   }
 
   let logoUrl: string;

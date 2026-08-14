@@ -6,8 +6,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { BOOKING_STATUS_LABELS, serviceLabel } from "@/lib/constants";
-import { formatDate } from "@/lib/utils";
+import { BOOKING_STATUS_LABELS, catCareLabels, hasPetCareProfile, serviceLabel } from "@/lib/constants";
+import { formatBookingWhen } from "@/lib/utils";
 
 type Stay = {
   id: string;
@@ -16,7 +16,12 @@ type Stay = {
   serviceType: string;
   startDate: Date;
   endDate: Date;
+  slotTime?: string | null;
   status: string;
+  species?: string;
+  castrated?: boolean | null;
+  vaccinated?: boolean | null;
+  aggressive?: boolean | null;
 };
 
 function StayList({
@@ -48,8 +53,13 @@ function StayList({
             <div className="min-w-0">
               <p className="font-medium">{stay.petName}</p>
               <p className="text-sm text-muted-foreground">{stay.tutorName}</p>
+              {hasPetCareProfile(stay.species) ? (
+                <p className="text-xs text-muted-foreground">
+                  {catCareLabels(stay).join(" · ")}
+                </p>
+              ) : null}
               <p className="text-xs text-muted-foreground">
-                {formatDate(stay.startDate)} → {formatDate(stay.endDate)}
+                {formatBookingWhen(stay.startDate, stay.endDate, stay.slotTime)}
               </p>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1">
@@ -61,6 +71,9 @@ function StayList({
                   stay.status as keyof typeof BOOKING_STATUS_LABELS
                 ] ?? stay.status}
               </Badge>
+              {hasPetCareProfile(stay.species) && stay.aggressive ? (
+                <Badge variant="warning">Agressivo</Badge>
+              ) : null}
             </div>
           </div>
         ))}
@@ -81,16 +94,16 @@ export function OccupationGrid({
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       <StayList
-        title="Check-ins de hoje"
+        title="Entradas de hoje"
         description="Reservas que entram hoje."
         stays={checkIns}
-        empty="Nenhum check-in previsto."
+        empty="Nenhuma entrada prevista."
       />
       <StayList
-        title="Check-outs de hoje"
+        title="Saídas de hoje"
         description="Pets que saem hoje."
         stays={checkOuts}
-        empty="Nenhum check-out previsto."
+        empty="Nenhuma saída prevista."
       />
       <StayList
         title="Hospedados agora"

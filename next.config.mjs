@@ -12,6 +12,7 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: "8mb",
     },
+    serverComponentsExternalPackages: ["@prisma/client", ".prisma/client"],
   },
 };
 

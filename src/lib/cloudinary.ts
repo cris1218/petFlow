@@ -42,8 +42,15 @@ export async function uploadHotelLogo(file: File, tenantId: string) {
     overwrite: true,
     invalidate: true,
     transformation: [
-      { width: 800, height: 800, crop: "limit", quality: "auto" },
+      {
+        width: 800,
+        height: 800,
+        crop: "pad",
+        background: "transparent",
+        quality: "auto",
+      },
     ],
+    format: "png",
   });
 }
 
@@ -60,6 +67,7 @@ async function uploadImage(
     public_id?: string;
     overwrite?: boolean;
     invalidate?: boolean;
+    format?: string;
     transformation: Array<Record<string, unknown>>;
   },
 ) {
@@ -76,6 +84,7 @@ async function uploadImage(
           overwrite: options.overwrite,
           invalidate: options.invalidate,
           resource_type: "image",
+          format: options.format,
           transformation: options.transformation,
         },
         (error, result) => {

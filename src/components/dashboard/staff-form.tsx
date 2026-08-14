@@ -34,7 +34,7 @@ export function CreateStaffForm() {
       <CardHeader>
         <CardTitle>Novo usuário da equipe</CardTitle>
         <CardDescription>
-          A equipe acessa reservas, check-in e diário. Cada usuário extra custa{" "}
+          A equipe acessa reservas, entrada e diário. Cada usuário extra custa{" "}
           R$ 9,90 no plano. O gestor inicial está incluso.
         </CardDescription>
       </CardHeader>

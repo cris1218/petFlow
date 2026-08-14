@@ -88,6 +88,10 @@ model Tenant {
   stayCapacity         Int          @default(10)
   appointmentCapacity  Int          @default(1)
   slotDurationMin      Int          @default(60)
+  acceptsCats          Boolean      @default(true)
+  acceptsDogSmall      Boolean      @default(true)
+  acceptsDogMedium     Boolean      @default(true)
+  acceptsDogLarge      Boolean      @default(true)
   billingPaidUntil     DateTime?
   status               TenantStatus @default(TRIAL)
   createdAt            DateTime     @default(now())
@@ -273,6 +277,9 @@ model Pet {
   size      PetSize
   birthDate DateTime?
   notes     String?
+  castrated Boolean?
+  vaccinated Boolean?
+  aggressive Boolean?
   createdAt DateTime   @default(now())
 
   tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)

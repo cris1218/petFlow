@@ -4,9 +4,6 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireHotelAdminSession } from "@/lib/auth";
 import {
-  DEFAULT_APPOINTMENT_CAPACITY,
-  DEFAULT_SLOT_DURATION_MIN,
-  DEFAULT_STAY_CAPACITY,
   TIME_PATTERN,
   WEEKDAY_ORDER,
   type WeekdayHours,
@@ -76,6 +73,10 @@ export async function saveHotelSchedule(input: {
   stayCapacity: number;
   appointmentCapacity: number;
   slotDurationMin: number;
+  acceptsCats: boolean;
+  acceptsDogSmall: boolean;
+  acceptsDogMedium: boolean;
+  acceptsDogLarge: boolean;
   weekdays: WeekdayHours[];
 }) {
   const { tenantId, user } = await requireHotelAdminSession();
@@ -109,6 +110,18 @@ export async function saveHotelSchedule(input: {
     };
   }
 
+  if (
+    !input.acceptsCats &&
+    !input.acceptsDogSmall &&
+    !input.acceptsDogMedium &&
+    !input.acceptsDogLarge
+  ) {
+    return {
+      ok: false as const,
+      error: "Escolha ao menos gatos ou um porte de cão.",
+    };
+  }
+
   const byWeekday = new Map(input.weekdays.map((day) => [day.weekday, day]));
   for (const weekday of WEEKDAY_ORDER) {
     const day = byWeekday.get(weekday);
@@ -128,40 +141,30 @@ export async function saveHotelSchedule(input: {
     }
   }
 
-  const existing = await prisma.tenantWeekday.findMany({
-    where: { tenantId },
-  });
-  const existingByDay = new Map(existing.map((row) => [row.weekday, row]));
-
-  await prisma.$transaction([
-    prisma.tenant.update({
-      where: { id: tenantId },
-      data: { stayCapacity, appointmentCapacity, slotDurationMin },
-    }),
-    ...WEEKDAY_ORDER.map((weekday) => {
-      const day = byWeekday.get(weekday)!;
-      const current = existingByDay.get(weekday);
-      if (current) {
-        return prisma.tenantWeekday.update({
-          where: { id: current.id },
-          data: {
+  await prisma.tenant.update({
+    where: { id: tenantId },
+    data: {
+      stayCapacity,
+      appointmentCapacity,
+      slotDurationMin,
+      acceptsCats: input.acceptsCats,
+      acceptsDogSmall: input.acceptsDogSmall,
+      acceptsDogMedium: input.acceptsDogMedium,
+      acceptsDogLarge: input.acceptsDogLarge,
+      weekdays: {
+        deleteMany: {},
+        create: WEEKDAY_ORDER.map((weekday) => {
+          const day = byWeekday.get(weekday)!;
+          return {
+            weekday,
             openTime: day.openTime,
             closeTime: day.closeTime,
             closed: day.closed,
-          },
-        });
-      }
-      return prisma.tenantWeekday.create({
-        data: {
-          tenantId,
-          weekday,
-          openTime: day.openTime,
-          closeTime: day.closeTime,
-          closed: day.closed,
-        },
-      });
-    }),
-  ]);
+          };
+        }),
+      },
+    },
+  });
 
   revalidatePath("/dashboard/configuracoes");
   revalidatePath(`/agendar/${user.tenant.slug}`);
@@ -172,9 +175,3 @@ export async function getHotelSchedule() {
   const { tenantId } = await requireHotelAdminSession();
   return getTenantScheduleConfig(tenantId);
 }
-
-export const scheduleDefaults = {
-  stayCapacity: DEFAULT_STAY_CAPACITY,
-  appointmentCapacity: DEFAULT_APPOINTMENT_CAPACITY,
-  slotDurationMin: DEFAULT_SLOT_DURATION_MIN,
-};

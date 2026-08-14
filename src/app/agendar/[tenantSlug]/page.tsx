@@ -1,10 +1,11 @@
 import { notFound } from "next/navigation";
 import { getTenantBySlug } from "@/lib/tenant";
 import { BookingWizard } from "@/components/booking/booking-wizard";
-import { APP_NAME } from "@/lib/constants";
+import { BrandMark } from "@/components/brand-mark";
+import { dogSizesFromFlags } from "@/lib/constants";
 import { isMercadoPagoConfigured } from "@/lib/mercadopago";
 import { ensureTenantServices, serializeTenantService } from "@/lib/services";
-import { ensureCheckInCatalog, serializeCatalogItem } from "@/lib/check-in-catalog";
+import { ensureTenantSchedule } from "@/lib/tenant-schedule";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -21,17 +22,11 @@ export default async function PublicBookingPage({
   }
 
   await ensureTenantServices(tenant);
-  await ensureCheckInCatalog(tenant.id);
-  const [services, requiredVaccines] = await Promise.all([
-    prisma.tenantService.findMany({
-      where: { tenantId: tenant.id, active: true },
-      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-    }),
-    prisma.tenantRequiredVaccine.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-    }),
-  ]);
+  await ensureTenantSchedule(tenant.id);
+  const services = await prisma.tenantService.findMany({
+    where: { tenantId: tenant.id, active: true },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+  });
   const pixEnabled = isMercadoPagoConfigured(tenant);
   const serviceNames = services.map((service) => service.name);
   const offerText =
@@ -44,15 +39,12 @@ export default async function PublicBookingPage({
   return (
     <div className="min-h-dvh bg-muted/40 px-4 py-6 sm:py-10">
       <div className="mx-auto mb-6 max-w-3xl text-center sm:mb-8">
-        {tenant.logoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={tenant.logoUrl}
-            alt={tenant.name}
-            className="mx-auto mb-4 h-16 w-auto max-w-[200px] object-contain sm:h-24 sm:max-w-[240px]"
-          />
-        ) : null}
-        <p className="text-sm font-medium text-primary">{APP_NAME}</p>
+        <BrandMark
+          logoUrl={tenant.logoUrl}
+          name={tenant.name}
+          size="lg"
+          className="mb-4"
+        />
         <h1 className="mt-1 text-2xl font-semibold sm:text-3xl">{tenant.name}</h1>
         <p className="text-muted-foreground">
           {offerText}
@@ -66,8 +58,12 @@ export default async function PublicBookingPage({
         tenantLogoUrl={tenant.logoUrl}
         services={services.map(serializeTenantService)}
         depositRate={Number(tenant.depositRate)}
-        requiredVaccines={requiredVaccines.map(serializeCatalogItem)}
+        requiredVaccines={[]}
         pixEnabled={pixEnabled}
+        petPolicy={{
+          acceptsCats: tenant.acceptsCats,
+          dogSizes: dogSizesFromFlags(tenant),
+        }}
       />
     </div>
   );

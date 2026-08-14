@@ -4,9 +4,9 @@ import {
   CalendarDays,
   Camera,
   CreditCard,
+  DoorClosed,
+  DoorOpen,
   LifeBuoy,
-  MessageCircle,
-  ClipboardCheck,
   Settings,
   UserRound,
   Users,
@@ -17,8 +17,8 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { href: "/dashboard", label: "Visão geral", icon: CalendarDays },
   { href: "/dashboard/daily-logs", label: "Diário de bordo", icon: Camera },
-  { href: "/dashboard/check-in", label: "Check-in e vacinas", icon: ClipboardCheck },
-  { href: "/dashboard/whatsapp", label: "WhatsApp", icon: MessageCircle, adminOnly: true },
+  { href: "/dashboard/check-in", label: "Entrada", icon: DoorOpen },
+  { href: "/dashboard/check-out", label: "Saída", icon: DoorClosed },
   { href: "/dashboard/configuracoes", label: "Configurações", icon: Settings, adminOnly: true },
   { href: "/dashboard/equipe", label: "Equipe", icon: Users, adminOnly: true },
   { href: "/dashboard/plano", label: "Plano", icon: CreditCard },
@@ -31,18 +31,21 @@ export function DashboardSidebar({
   role,
   billingLabel,
   billingExpired,
+  logoUrl,
   children,
 }: {
   tenantName: string;
   role: "ADMIN" | "STAFF" | "MASTER";
   billingLabel: string;
   billingExpired?: boolean;
+  logoUrl?: string | null;
   children: React.ReactNode;
 }) {
   const items = NAV.filter((item) => !item.adminOnly || role === "ADMIN");
 
   return (
     <AppShell
+      logoUrl={logoUrl}
       subtitle={`${tenantName}${role === "STAFF" ? " · Equipe" : ""}`}
       extra={
         <p

@@ -5,6 +5,7 @@ import { submitAccessRequest } from "@/actions/leads";
 import { useFeedback } from "@/components/app-feedback";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { WhatsAppInput } from "@/components/ui/whatsapp-input";
 import { Label } from "@/components/ui/label";
 
 export function AccessRequestForm() {
@@ -54,12 +55,10 @@ export function AccessRequestForm() {
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Nome do hotel" value={hotelName} onChange={setHotelName} />
         <Field label="Cidade" value={city} onChange={setCity} />
-        <Field
-          label="WhatsApp"
-          value={phone}
-          onChange={setPhone}
-          placeholder="11999999999"
-        />
+        <div className="space-y-2">
+          <Label>WhatsApp</Label>
+          <WhatsAppInput value={phone} onChange={setPhone} required />
+        </div>
         <Field label="E-mail" value={email} onChange={setEmail} type="email" />
       </div>
       <div className="space-y-2">

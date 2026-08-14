@@ -11,6 +11,7 @@ import {
   uploadHotelLogoAction,
 } from "@/actions/settings";
 import { HotelServicesForm, type HotelServiceItem } from "@/components/dashboard/hotel-services-form";
+import { HotelScheduleForm, type HotelScheduleValues } from "@/components/dashboard/schedule-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -24,8 +25,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { formatBRL } from "@/lib/utils";
+import { WhatsAppInput } from "@/components/ui/whatsapp-input";
 import { useFeedback } from "@/components/app-feedback";
 import { MercadoPagoSetupGuide } from "@/components/mercadopago-setup-guide";
+import { BrandMark } from "@/components/brand-mark";
+import { WhatsAppQrCard } from "@/components/dashboard/whatsapp-qr";
+import { LOGO_UPLOAD_HINT } from "@/lib/constants";
 
 export type SettingsFormValues = {
   name: string;
@@ -36,9 +41,20 @@ export type SettingsFormValues = {
   webhookUrl: string;
   logoUrl: string | null;
   services: HotelServiceItem[];
+  schedule: HotelScheduleValues;
 };
 
-export function SettingsForm({ initial }: { initial: SettingsFormValues }) {
+export function SettingsForm({
+  initial,
+  whatsapp,
+}: {
+  initial: SettingsFormValues;
+  whatsapp: {
+    connected: boolean;
+    number: string | null;
+    instanceName: string;
+  };
+}) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [whatsappNumber, setWhatsappNumber] = useState(initial.whatsappNumber);
   const [depositRate, setDepositRate] = useState(
@@ -57,6 +73,12 @@ export function SettingsForm({ initial }: { initial: SettingsFormValues }) {
 
   function onLogoChange(file?: File) {
     if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      const message = "O logo deve ter no máximo 2 MB.";
+      setHotelError(message);
+      toastError(message);
+      return;
+    }
     const formData = new FormData();
     formData.set("logo", file);
     startHotel(async () => {
@@ -85,7 +107,12 @@ export function SettingsForm({ initial }: { initial: SettingsFormValues }) {
   function saveWhatsApp() {
     startHotel(async () => {
       setHotelError(null);
-      await saveHotelWhatsApp(whatsappNumber);
+      const result = await saveHotelWhatsApp(whatsappNumber);
+      if (!result.ok) {
+        setHotelError(result.error);
+        toastError(result.error);
+        return;
+      }
       success("WhatsApp salvo.");
     });
   }
@@ -142,26 +169,15 @@ export function SettingsForm({ initial }: { initial: SettingsFormValues }) {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label>Logo na agenda</Label>
-            <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
-              <div className="flex h-24 w-full max-w-40 items-center justify-center overflow-hidden rounded-xl border bg-muted">
-                {logoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={logoUrl}
-                    alt={`Logo ${initial.name}`}
-                    className="h-full w-full object-contain p-2"
-                  />
-                ) : (
-                  <span className="px-2 text-center text-xs text-muted-foreground">
-                    Sem logo
-                  </span>
-                )}
+            <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-start">
+              <div className="flex h-28 w-full max-w-[16rem] items-center justify-center overflow-hidden rounded-xl border bg-muted p-3">
+                <BrandMark logoUrl={logoUrl} name={initial.name} size="lg" />
               </div>
-              <div className="space-y-2">
+              <div className="min-w-0 flex-1 space-y-2">
                 <input
                   ref={fileRef}
                   type="file"
-                  accept="image/jpeg,image/png,image/webp"
+                  accept="image/png,image/webp,image/jpeg"
                   className="hidden"
                   onChange={(event) => onLogoChange(event.target.files?.[0])}
                 />
@@ -188,19 +204,18 @@ export function SettingsForm({ initial }: { initial: SettingsFormValues }) {
                     </Button>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  JPG, PNG ou WEBP, até 4 MB. Aparece no topo da agenda pública.
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  {LOGO_UPLOAD_HINT}
                 </p>
               </div>
             </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="whatsapp">WhatsApp do hotel</Label>
-            <Input
+            <WhatsAppInput
               id="whatsapp"
               value={whatsappNumber}
-              onChange={(event) => setWhatsappNumber(event.target.value)}
-              placeholder="11999999999"
+              onChange={setWhatsappNumber}
             />
           </div>
           {hotelError && <p className="text-sm text-destructive">{hotelError}</p>}
@@ -211,13 +226,21 @@ export function SettingsForm({ initial }: { initial: SettingsFormValues }) {
         </CardContent>
       </Card>
 
+      <WhatsAppQrCard
+        connected={whatsapp.connected}
+        number={whatsapp.number}
+        instanceName={whatsapp.instanceName}
+      />
+
+      <HotelScheduleForm initial={initial.schedule} />
+
       <Card>
         <CardHeader>
           <CardTitle>Serviços e sinal</CardTitle>
           <CardDescription>
             Cadastre hotel, diária, banho e tosa, petsitter e o que mais o
-            estabelecimento oferecer. Ative para aparecer na reserva; desative
-            para esconder. O sinal é o percentual cobrado no PIX.
+            estabelecimento oferecer. Em cada serviço, escolha se a agenda é
+            por vaga (estadia) ou por horário. O sinal é o percentual do PIX.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">

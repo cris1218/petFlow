@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { phoneDigits } from "@/lib/utils";
 
 export const loginSchema = z.object({
   email: z.string().email("E-mail inválido."),
@@ -22,10 +23,18 @@ export const createBookingSchema = z.object({
     .optional(),
   tutor: z.object({
     name: z.string().min(2),
-    phone: z.string().min(10),
+    phone: z
+      .string()
+      .transform((value) => phoneDigits(value))
+      .pipe(z.string().min(10, "WhatsApp inválido.")),
     cpf: z.string().optional(),
     address: z.string().optional(),
-    email: z.union([z.string().email(), z.literal("")]).optional(),
+    pix: z
+      .object({
+        kind: z.enum(["CPF", "EMAIL", "PHONE"]),
+        key: z.string().min(1),
+      })
+      .optional(),
   }),
   pet: z.object({
     name: z.string().min(1),
@@ -34,6 +43,9 @@ export const createBookingSchema = z.object({
     size: z.enum(["SMALL", "MEDIUM", "LARGE"]),
     birthDate: z.coerce.date().optional(),
     notes: z.string().optional(),
+    castrated: z.boolean().optional(),
+    vaccinated: z.boolean().optional(),
+    aggressive: z.boolean().optional(),
   }),
   vaccines: z
     .array(

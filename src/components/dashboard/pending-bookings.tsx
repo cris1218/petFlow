@@ -12,17 +12,22 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { serviceLabel } from "@/lib/constants";
-import { formatBRL, formatDate } from "@/lib/utils";
+import { catCareLabels, hasPetCareProfile, serviceLabel } from "@/lib/constants";
+import { formatBRL, formatBookingWhen, formatWhatsAppMask } from "@/lib/utils";
 
 type PendingBooking = {
   id: string;
   petName: string;
+  species?: string;
+  castrated?: boolean | null;
+  vaccinated?: boolean | null;
+  aggressive?: boolean | null;
   tutorName: string;
   tutorPhone: string;
   serviceType: string;
   startDate: Date;
   endDate: Date;
+  slotTime?: string | null;
   depositAmount: number;
   paymentStatus: string;
 };
@@ -52,10 +57,15 @@ export function PendingBookings({ bookings }: { bookings: PendingBooking[] }) {
             <div className="min-w-0">
               <p className="font-medium">{booking.petName}</p>
               <p className="text-sm text-muted-foreground">
-                {booking.tutorName} · {booking.tutorPhone}
+                {booking.tutorName} · {formatWhatsAppMask(booking.tutorPhone)}
               </p>
+              {hasPetCareProfile(booking.species) ? (
+                <p className="text-xs text-muted-foreground">
+                  {catCareLabels(booking).join(" · ")}
+                </p>
+              ) : null}
               <p className="text-xs text-muted-foreground">
-                {formatDate(booking.startDate)} → {formatDate(booking.endDate)} ·
+                {formatBookingWhen(booking.startDate, booking.endDate, booking.slotTime)} ·
                 sinal {formatBRL(booking.depositAmount)}
               </p>
             </div>

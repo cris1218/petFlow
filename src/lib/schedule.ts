@@ -45,11 +45,30 @@ export function inferServiceKind(name: string): ServiceKind {
 }
 
 export function toDateKey(value: Date | string) {
-  const date = typeof value === "string" ? parseDateKey(value) : value;
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+    return value.slice(0, 10);
+  }
+  return saoPauloParts(value instanceof Date ? value : new Date(value)).dateKey;
+}
+
+function saoPauloParts(date: Date) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: "America/Sao_Paulo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+      .formatToParts(date)
+      .map((part) => [part.type, part.value]),
+  );
+  return {
+    dateKey: `${parts.year}-${parts.month}-${parts.day}`,
+    time: `${parts.hour}:${parts.minute}`,
+  };
 }
 
 export function parseDateKey(value: string) {
@@ -119,12 +138,13 @@ export function eachDateKey(startDate: Date, endDate: Date) {
 }
 
 export function isPastDateKey(dateKey: string) {
-  return parseDateKey(dateKey) < parseDateKey(toDateKey(new Date()));
+  return dateKey < saoPauloParts(new Date()).dateKey;
 }
 
 export function isPastSlot(dateKey: string, time: string) {
-  const slot = new Date(`${dateKey}T${time}:00`);
-  return slot.getTime() <= Date.now();
+  const now = saoPauloParts(new Date());
+  if (dateKey !== now.dateKey) return dateKey < now.dateKey;
+  return time <= now.time;
 }
 
 export const ACTIVE_SCHEDULE_STATUSES = [

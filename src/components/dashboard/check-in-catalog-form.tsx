@@ -1,11 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import {
-  createRequiredVaccine,
   createTenantBelonging,
-  deleteRequiredVaccine,
   deleteTenantBelonging,
 } from "@/actions/check-in-catalog";
 import { useFeedback } from "@/components/app-feedback";
@@ -23,30 +21,18 @@ type CatalogItem = { id: string; name: string };
 
 export function CheckInCatalogForm({
   belongings,
-  vaccines,
 }: {
   belongings: CatalogItem[];
-  vaccines: CatalogItem[];
 }) {
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <NameList
-        title="Pertences do check-in"
-        description="Cadastre o que o hotel costuma receber. Na hora do check-in, a equipe marca o que o tutor trouxe."
-        placeholder="Ex.: Ração, Coleira, Cama"
-        items={belongings}
-        add={createTenantBelonging}
-        remove={deleteTenantBelonging}
-      />
-      <NameList
-        title="Vacinas necessárias"
-        description="Cadastre as vacinas que o pet precisa ter. Não usa data: só se tem ou não tem."
-        placeholder="Ex.: V10, Raiva, Giárdia"
-        items={vaccines}
-        add={createRequiredVaccine}
-        remove={deleteRequiredVaccine}
-      />
-    </div>
+    <NameList
+      title="Pertences da entrada"
+      description="Cadastre o que o hotel costuma receber. Na hora da entrada, a equipe marca o que o tutor trouxe."
+      placeholder="Ex.: Ração, Coleira, Cama"
+      items={belongings}
+      add={createTenantBelonging}
+      remove={deleteTenantBelonging}
+    />
   );
 }
 
@@ -72,6 +58,10 @@ function NameList({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const { success, error: toastError } = useFeedback();
+
+  useEffect(() => {
+    setList(items);
+  }, [items]);
 
   return (
     <Card>

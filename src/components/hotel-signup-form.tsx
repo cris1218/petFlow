@@ -6,6 +6,7 @@ import { useFeedback } from "@/components/app-feedback";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
+import { WhatsAppInput } from "@/components/ui/whatsapp-input";
 import { Label } from "@/components/ui/label";
 import { BILLING } from "@/lib/billing";
 import { formatBRL } from "@/lib/utils";
@@ -46,12 +47,10 @@ export function HotelSignupForm() {
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Nome do hotel" value={hotelName} onChange={setHotelName} />
         <Field label="Seu nome (gestor)" value={adminName} onChange={setAdminName} />
-        <Field
+        <WhatsAppField
           label="WhatsApp"
           value={whatsapp}
           onChange={setWhatsapp}
-          placeholder="11999999999"
-          required={false}
         />
         <Field label="E-mail de login" value={email} onChange={setEmail} type="email" />
       </div>
@@ -77,6 +76,23 @@ export function HotelSignupForm() {
         {isPending ? "Criando..." : "Começar grátis"}
       </Button>
     </form>
+  );
+}
+
+function WhatsAppField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <WhatsAppInput value={value} onChange={onChange} />
+    </div>
   );
 }
 

@@ -45,7 +45,7 @@ export default function HomePage() {
           <Feature
             icon={CalendarDays}
             title="Agenda e ocupação"
-            text="Grade do dia com check-ins, check-outs e pets hospedados."
+            text="Grade do dia com entradas, saídas e pets hospedados."
           />
           <Feature
             icon={Camera}
@@ -55,7 +55,7 @@ export default function HomePage() {
           <Feature
             icon={ShieldCheck}
             title="Vacinas e pertences"
-            text="Alerta de vacina vencida e checklist de ração, medicação e coleira."
+            text="Checklist de vacinas e pertences: ração, medicação, coleira e o que o hotel exigir."
           />
           <Feature
             icon={MessageCircle}

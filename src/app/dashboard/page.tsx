@@ -13,7 +13,7 @@ export default async function DashboardPage() {
       <div>
         <h1 className="text-xl font-semibold sm:text-2xl">Visão geral</h1>
         <p className="text-sm text-muted-foreground">
-          Ocupação do dia, check-ins e check-outs.
+          Ocupação do dia, entradas e saídas.
         </p>
       </div>
       <PendingBookings bookings={pending} />

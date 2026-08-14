@@ -59,6 +59,7 @@ export async function createPixPayment(input: {
   amount: number;
   description: string;
   payerEmail: string;
+  payerCpf?: string;
   externalReference: string;
 }): Promise<PixCharge> {
   const payment = new Payment(mpClient(input.accessToken));
@@ -71,6 +72,9 @@ export async function createPixPayment(input: {
       payment_method_id: "pix",
       payer: {
         email: input.payerEmail,
+        ...(input.payerCpf
+          ? { identification: { type: "CPF", number: input.payerCpf } }
+          : {}),
       },
       external_reference: input.externalReference,
       notification_url: notificationUrl,
@@ -93,12 +97,14 @@ export async function createPixDeposit(input: {
   amount: number;
   description: string;
   payerEmail: string;
+  payerCpf?: string;
 }): Promise<PixCharge> {
   return createPixPayment({
     accessToken: input.accessToken,
     amount: input.amount,
     description: input.description,
     payerEmail: input.payerEmail,
+    payerCpf: input.payerCpf,
     externalReference: input.bookingId,
   });
 }

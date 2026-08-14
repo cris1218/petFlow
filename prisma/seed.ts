@@ -1,7 +1,38 @@
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
+import { defaultWeekdays } from "../src/lib/schedule";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient() as PrismaClient & {
+  tenantService: {
+    count: (args: { where: { tenantId: string } }) => Promise<number>;
+    createMany: (args: {
+      data: Array<{
+        tenantId: string;
+        name: string;
+        price: number;
+        sortOrder: number;
+        active: boolean;
+        kind: "STAY" | "APPOINTMENT";
+      }>;
+    }) => Promise<unknown>;
+    updateMany: (args: {
+      where: { tenantId: string; name: string };
+      data: { kind: "STAY" | "APPOINTMENT" };
+    }) => Promise<unknown>;
+  };
+  tenantWeekday: {
+    count: (args: { where: { tenantId: string } }) => Promise<number>;
+    createMany: (args: {
+      data: Array<{
+        tenantId: string;
+        weekday: number;
+        openTime: string;
+        closeTime: string;
+        closed: boolean;
+      }>;
+    }) => Promise<unknown>;
+  };
+};
 
 async function main() {
   const passwordHash = await bcrypt.hash("demo1234", 10);
@@ -26,16 +57,7 @@ async function main() {
         data: tenantData,
       })
     : await prisma.tenant.create({
-        data: {
-          ...tenantData,
-          services: {
-            create: [
-              { name: "Hotel", price: 80, sortOrder: 0, active: true },
-              { name: "Creche / diária", price: 50, sortOrder: 1, active: true },
-              { name: "Banho e tosa", price: 70, sortOrder: 2, active: true },
-            ],
-          },
-        },
+        data: tenantData,
       });
 
   const serviceCount = await prisma.tenantService.count({
@@ -44,10 +66,24 @@ async function main() {
   if (serviceCount === 0) {
     await prisma.tenantService.createMany({
       data: [
-        { tenantId: tenant.id, name: "Hotel", price: 80, sortOrder: 0, active: true },
-        { tenantId: tenant.id, name: "Creche / diária", price: 50, sortOrder: 1, active: true },
-        { tenantId: tenant.id, name: "Banho e tosa", price: 70, sortOrder: 2, active: true },
+        { tenantId: tenant.id, name: "Hotel", price: 80, sortOrder: 0, active: true, kind: "STAY" },
+        { tenantId: tenant.id, name: "Creche / diária", price: 50, sortOrder: 1, active: true, kind: "STAY" },
+        { tenantId: tenant.id, name: "Banho e tosa", price: 70, sortOrder: 2, active: true, kind: "APPOINTMENT" },
       ],
+    });
+  } else {
+    await prisma.tenantService.updateMany({
+      where: { tenantId: tenant.id, name: "Banho e tosa" },
+      data: { kind: "APPOINTMENT" },
+    });
+  }
+
+  const weekdayCount = await prisma.tenantWeekday.count({
+    where: { tenantId: tenant.id },
+  });
+  if (weekdayCount === 0) {
+    await prisma.tenantWeekday.createMany({
+      data: defaultWeekdays().map((day) => ({ tenantId: tenant.id, ...day })),
     });
   }
 

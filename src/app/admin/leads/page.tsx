@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { listAccessRequests } from "@/actions/leads";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatWhatsAppMask } from "@/lib/utils";
 
 export default async function AdminLeadsPage() {
   const result = await listAccessRequests();
@@ -22,7 +22,7 @@ export default async function AdminLeadsPage() {
           <div key={lead.id} className="rounded-xl border bg-card p-4">
             <p className="font-medium">{lead.hotelName}</p>
             <p className="text-sm text-muted-foreground">
-              {lead.city} · {lead.phone} · {lead.email}
+              {lead.city} · {formatWhatsAppMask(lead.phone)} · {lead.email}
             </p>
             {lead.notes && (
               <p className="mt-2 text-sm text-muted-foreground">{lead.notes}</p>

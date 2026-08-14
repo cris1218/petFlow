@@ -10,7 +10,9 @@ import { requireStaffSession } from "@/lib/auth";
 import { assertOwnedBooking } from "@/lib/tenant";
 import { sendWhatsAppText, whatsappTemplates } from "@/lib/whatsapp";
 import { toDateKey } from "@/lib/schedule";
+import { dogSizesFromFlags, hasPetCareProfile, sizesForSpecies } from "@/lib/constants";
 import { assertSlotAvailable } from "@/lib/tenant-schedule";
+import { cpfDigits, phoneDigits, pixPayerEmail } from "@/lib/utils";
 
 export type CreateBookingInput = {
   tenantSlug: string;
@@ -23,7 +25,10 @@ export type CreateBookingInput = {
     phone: string;
     cpf?: string;
     address?: string;
-    email?: string;
+    pix?: {
+      kind: "CPF" | "EMAIL" | "PHONE";
+      key: string;
+    };
   };
   pet: {
     name: string;
@@ -32,11 +37,40 @@ export type CreateBookingInput = {
     size: "SMALL" | "MEDIUM" | "LARGE";
     birthDate?: string;
     notes?: string;
+    castrated?: boolean;
+    vaccinated?: boolean;
+    aggressive?: boolean;
   };
   vaccines?: Array<{
     name: string;
   }>;
 };
+
+function resolvePixPayer(pix?: { kind: "CPF" | "EMAIL" | "PHONE"; key: string }) {
+  if (!pix?.key.trim()) return null;
+
+  if (pix.kind === "EMAIL") {
+    const email = pix.key.trim().toLowerCase();
+    if (!email.includes("@") || email.length < 5) {
+      return { ok: false as const, error: "Informe um e-mail PIX válido." };
+    }
+    return { ok: true as const, email, cpf: undefined };
+  }
+
+  if (pix.kind === "CPF") {
+    const digits = cpfDigits(pix.key);
+    if (digits.length !== 11) {
+      return { ok: false as const, error: "Informe um CPF PIX válido." };
+    }
+    return { ok: true as const, email: pixPayerEmail("CPF", digits), cpf: digits };
+  }
+
+  const digits = phoneDigits(pix.key);
+  if (digits.length < 10) {
+    return { ok: false as const, error: "Informe um celular PIX válido." };
+  }
+  return { ok: true as const, email: pixPayerEmail("PHONE", digits), cpf: undefined };
+}
 
 export async function createBooking(input: CreateBookingInput) {
   const parsed = createBookingSchema.safeParse(input);
@@ -46,6 +80,19 @@ export async function createBooking(input: CreateBookingInput) {
   }
 
   const data = parsed.data;
+
+  if (hasPetCareProfile(data.pet.species)) {
+    if (
+      data.pet.castrated === undefined ||
+      data.pet.vaccinated === undefined ||
+      data.pet.aggressive === undefined
+    ) {
+      return {
+        ok: false as const,
+        error: "Informe se o pet é castrado, se tomou vacina e se é agressivo.",
+      };
+    }
+  }
 
   if (data.endDate < data.startDate) {
     return {
@@ -66,6 +113,33 @@ export async function createBooking(input: CreateBookingInput) {
 
   if (!tenant || tenant.status === "SUSPENDED") {
     return { ok: false as const, error: "Estabelecimento indisponível." };
+  }
+
+  const accessToken = resolveMercadoPagoToken(tenant);
+  const pixPayer = resolvePixPayer(data.tutor.pix);
+  if (accessToken) {
+    if (!pixPayer) {
+      return {
+        ok: false as const,
+        error: "Informe a chave PIX: CPF, e-mail ou celular.",
+      };
+    }
+    if (!pixPayer.ok) return pixPayer;
+  }
+
+  const policy = {
+    acceptsCats: tenant.acceptsCats,
+    dogSizes: dogSizesFromFlags(tenant),
+  };
+  if (data.pet.species === "CAT" && !policy.acceptsCats) {
+    return { ok: false as const, error: "Este hotel não atende gatos." };
+  }
+  if (data.pet.species !== "CAT" && policy.dogSizes.length === 0) {
+    return { ok: false as const, error: "Este hotel não atende cães." };
+  }
+  const petSize = data.pet.species === "CAT" ? "SMALL" : data.pet.size;
+  if (!sizesForSpecies(data.pet.species, policy).includes(petSize)) {
+    return { ok: false as const, error: "Este hotel não atende esse porte." };
   }
 
   const service = await prisma.tenantService.findFirst({
@@ -147,9 +221,12 @@ export async function createBooking(input: CreateBookingInput) {
         name: data.pet.name,
         species: data.pet.species,
         breed: data.pet.breed,
-        size: data.pet.size,
+        size: petSize,
         birthDate: data.pet.birthDate,
         notes: data.pet.notes,
+        castrated: hasPetCareProfile(data.pet.species) ? data.pet.castrated ?? null : null,
+        vaccinated: hasPetCareProfile(data.pet.species) ? data.pet.vaccinated ?? null : null,
+        aggressive: hasPetCareProfile(data.pet.species) ? data.pet.aggressive ?? null : null,
       },
     });
 
@@ -184,7 +261,6 @@ export async function createBooking(input: CreateBookingInput) {
     });
   });
 
-  const accessToken = resolveMercadoPagoToken(tenant);
   let pix: {
     paymentId: string;
     qrCode: string;
@@ -199,7 +275,11 @@ export async function createBooking(input: CreateBookingInput) {
         bookingId: booking.id,
         amount: pricing.depositAmount,
         description: `Sinal PetFlow · ${service.name} · ${booking.pet.name}`,
-        payerEmail: data.tutor.email ?? `tutor-${booking.pet.tutor.id}@petflow.app`,
+        payerEmail:
+          pixPayer && pixPayer.ok
+            ? pixPayer.email
+            : `tutor-${booking.pet.tutor.id}@petflow.app`,
+        payerCpf: pixPayer && pixPayer.ok ? pixPayer.cpf : undefined,
       });
 
       await prisma.booking.update({
@@ -268,6 +348,7 @@ export async function confirmPaidBooking(bookingId: string) {
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/check-in");
+  revalidatePath("/dashboard/check-out");
   return { ok: true as const };
 }
 
@@ -288,6 +369,10 @@ export async function getPendingBookings() {
   return bookings.map((booking) => ({
     id: booking.id,
     petName: booking.pet.name,
+    species: booking.pet.species,
+    castrated: booking.pet.castrated,
+    vaccinated: booking.pet.vaccinated,
+    aggressive: booking.pet.aggressive,
     tutorName: booking.pet.tutor.name,
     tutorPhone: booking.pet.tutor.phone,
     serviceType: booking.serviceType,
@@ -332,7 +417,7 @@ export async function checkInBooking(input: {
   if (booking.status !== "CONFIRMED") {
     return {
       ok: false as const,
-      error: "Só é possível fazer check-in de reservas confirmadas.",
+      error: "Só é possível registrar a entrada de reservas confirmadas.",
     };
   }
 
@@ -380,6 +465,7 @@ export async function checkInBooking(input: {
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/check-in");
+  revalidatePath("/dashboard/check-out");
   revalidatePath("/dashboard/daily-logs");
 
   return {
@@ -388,14 +474,31 @@ export async function checkInBooking(input: {
   };
 }
 
-export async function checkOutBooking(bookingId: string) {
+export async function checkOutBooking(
+  bookingId: string,
+  returnedItemIds: string[] = [],
+) {
   const { tenantId } = await requireStaffSession();
   const booking = await assertOwnedBooking(tenantId, bookingId);
 
   if (booking.status !== "CHECKED_IN") {
     return {
       ok: false as const,
-      error: "Só é possível fazer check-out de pets hospedados.",
+      error: "Só é possível registrar a saída de pets hospedados.",
+    };
+  }
+
+  const checklist = await prisma.checklistItem.findMany({
+    where: { bookingId, tenantId },
+    select: { id: true },
+  });
+  const returned = new Set(returnedItemIds);
+  const missing = checklist.filter((item) => !returned.has(item.id));
+
+  if (missing.length > 0) {
+    return {
+      ok: false as const,
+      error: "Marque todos os pertences devolvidos para liberar a saída.",
     };
   }
 
@@ -412,6 +515,7 @@ export async function checkOutBooking(bookingId: string) {
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/check-in");
+  revalidatePath("/dashboard/check-out");
   revalidatePath("/dashboard/daily-logs");
 
   return { ok: true as const };
@@ -468,6 +572,9 @@ function serializeStay(booking: {
   pet: {
     name: string;
     species: string;
+    castrated?: boolean | null;
+    vaccinated?: boolean | null;
+    aggressive?: boolean | null;
     tutor: { name: string; phone: string };
   };
 }) {
@@ -481,6 +588,9 @@ function serializeStay(booking: {
     totalAmount: serializeMoney(booking.totalAmount),
     petName: booking.pet.name,
     species: booking.pet.species,
+    castrated: booking.pet.castrated ?? null,
+    vaccinated: booking.pet.vaccinated ?? null,
+    aggressive: booking.pet.aggressive ?? null,
     tutorName: booking.pet.tutor.name,
     tutorPhone: booking.pet.tutor.phone,
   };

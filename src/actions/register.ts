@@ -6,7 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { createSession } from "@/lib/auth";
 import { defaultServicesCreate } from "@/lib/services";
 import { defaultBelongingsCreate, defaultVaccinesCreate } from "@/lib/check-in-catalog";
-import { slugify } from "@/lib/utils";
+import { defaultWeekdays } from "@/lib/schedule";
+import { phoneDigits, slugify } from "@/lib/utils";
 
 export async function registerHotel(input: {
   hotelName: string;
@@ -19,7 +20,10 @@ export async function registerHotel(input: {
   const adminName = input.adminName.trim();
   const email = input.email.trim().toLowerCase();
   const password = input.password.trim();
-  const whatsapp = input.whatsapp?.trim() || null;
+  const whatsapp = input.whatsapp ? phoneDigits(input.whatsapp) || null : null;
+  if (whatsapp && whatsapp.length < 10) {
+    return { ok: false as const, error: "Informe um WhatsApp válido." };
+  }
   const slug = slugify(hotelName);
 
   if (hotelName.length < 2) {
@@ -73,6 +77,9 @@ export async function registerHotel(input: {
       },
       requiredVaccines: {
         create: defaultVaccinesCreate(),
+      },
+      weekdays: {
+        create: defaultWeekdays(),
       },
     },
     include: {

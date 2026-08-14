@@ -4,6 +4,7 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import { Camera, PawPrint, Send, Upload } from "lucide-react";
 import { createDailyLog } from "@/actions/daily-logs";
 import { QUICK_STATUS_NOTES, SPECIES_LABELS } from "@/lib/constants";
+import { formatWhatsAppMask } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -98,7 +99,7 @@ export function DailyLogCard({ stays }: DailyLogCardProps) {
         <CardHeader>
           <CardTitle>Nenhum pet hospedado</CardTitle>
           <CardDescription>
-            O diário de bordo só fica disponível após o check-in.
+            O diário de bordo só fica disponível após a entrada.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -136,7 +137,7 @@ export function DailyLogCard({ stays }: DailyLogCardProps) {
               <p className="text-xs text-muted-foreground">
                 {SPECIES_LABELS[selected.species as keyof typeof SPECIES_LABELS] ??
                   selected.species}{" "}
-                · WhatsApp {selected.tutorPhone}
+                · WhatsApp {formatWhatsAppMask(selected.tutorPhone)}
               </p>
             )}
           </div>

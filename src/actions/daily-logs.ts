@@ -52,7 +52,7 @@ export async function createDailyLog(formData: FormData) {
   if (booking.status !== "CHECKED_IN") {
     return {
       ok: false as const,
-      error: "O diário só pode ser enviado para pets com check-in feito.",
+      error: "O diário só pode ser enviado para pets que já deram entrada.",
     };
   }
 

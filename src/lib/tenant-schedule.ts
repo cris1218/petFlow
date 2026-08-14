@@ -4,7 +4,6 @@ import {
   DEFAULT_SLOT_DURATION_MIN,
   DEFAULT_STAY_CAPACITY,
   defaultWeekdays,
-  eachDateKey,
   generateTimeSlots,
   isPastDateKey,
   isPastSlot,
@@ -32,27 +31,34 @@ export function serializeWeekday(row: {
 }
 
 export async function ensureTenantSchedule(tenantId: string) {
-  const weekdayCount = await prisma.tenantWeekday.count({ where: { tenantId } });
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: {
+      weekdays: { select: { id: true }, take: 1 },
+    },
+  });
 
-  if (weekdayCount === 0) {
-    await prisma.tenantWeekday.createMany({
-      data: defaultWeekdays().map((day) => ({
-        tenantId,
-        ...day,
-      })),
-    });
-    await prisma.tenantService.updateMany({
-      where: {
-        tenantId,
-        kind: "STAY",
-        OR: [
-          { name: { contains: "banho", mode: "insensitive" } },
-          { name: { contains: "tosa", mode: "insensitive" } },
-        ],
+  if (!tenant || tenant.weekdays.length > 0) return;
+
+  await prisma.tenant.update({
+    where: { id: tenantId },
+    data: {
+      weekdays: {
+        create: defaultWeekdays(),
       },
-      data: { kind: "APPOINTMENT" },
-    });
-  }
+    },
+  });
+  await prisma.tenantService.updateMany({
+    where: {
+      tenantId,
+      kind: "STAY",
+      OR: [
+        { name: { contains: "banho", mode: "insensitive" } },
+        { name: { contains: "tosa", mode: "insensitive" } },
+      ],
+    },
+    data: { kind: "APPOINTMENT" },
+  });
 }
 
 export async function getTenantScheduleConfig(tenantId: string) {
@@ -63,6 +69,10 @@ export async function getTenantScheduleConfig(tenantId: string) {
       stayCapacity: true,
       appointmentCapacity: true,
       slotDurationMin: true,
+      acceptsCats: true,
+      acceptsDogSmall: true,
+      acceptsDogMedium: true,
+      acceptsDogLarge: true,
       weekdays: { orderBy: { weekday: "asc" } },
     },
   });
@@ -71,6 +81,10 @@ export async function getTenantScheduleConfig(tenantId: string) {
     stayCapacity: tenant?.stayCapacity ?? DEFAULT_STAY_CAPACITY,
     appointmentCapacity: tenant?.appointmentCapacity ?? DEFAULT_APPOINTMENT_CAPACITY,
     slotDurationMin: tenant?.slotDurationMin ?? DEFAULT_SLOT_DURATION_MIN,
+    acceptsCats: tenant?.acceptsCats ?? true,
+    acceptsDogSmall: tenant?.acceptsDogSmall ?? true,
+    acceptsDogMedium: tenant?.acceptsDogMedium ?? true,
+    acceptsDogLarge: tenant?.acceptsDogLarge ?? true,
     weekdays: (tenant?.weekdays ?? defaultWeekdays()).map(serializeWeekday),
   };
 }
@@ -108,7 +122,7 @@ export async function getStayAvailability(input: {
     }
   }
 
-  const peak = Math.max(...occupancy.values(), 0);
+  const peak = Math.max(0, ...Array.from(occupancy.values()));
   const remaining = Math.max(0, config.stayCapacity - peak);
   const fullDays = days.filter(
     (day) => (occupancy.get(day) ?? 0) >= config.stayCapacity,
@@ -130,12 +144,11 @@ export async function getAppointmentSlots(input: {
   const config = await getTenantScheduleConfig(input.tenantId);
   const weekday = weekdayFromDateKey(input.dateKey);
   const hours = weekdayMap(config.weekdays).get(weekday);
-  const closed = !hours || hours.closed;
   const pastDay = isPastDateKey(input.dateKey);
 
-  if (closed || pastDay) {
+  if (!hours || hours.closed || pastDay) {
     return {
-      closed,
+      closed: !hours || hours.closed,
       pastDay,
       slots: [] as Array<{ time: string; available: boolean }>,
       durationMin: config.slotDurationMin,
@@ -180,7 +193,6 @@ export async function getAppointmentSlots(input: {
         !isPastSlot(input.dateKey, time) &&
         (taken.get(time) ?? 0) < config.appointmentCapacity,
     })),
-    day,
   };
 }
 
@@ -229,8 +241,4 @@ export async function assertSlotAvailable(input: {
     };
   }
   return { ok: true as const };
-}
-
-export function dateKeysForRange(startDate: Date, endDate: Date) {
-  return eachDateKey(startDate, endDate);
 }

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireMasterSession } from "@/lib/auth";
+import { phoneDigits } from "@/lib/utils";
 
 export async function submitAccessRequest(input: {
   hotelName: string;
@@ -13,7 +14,7 @@ export async function submitAccessRequest(input: {
 }) {
   const hotelName = input.hotelName.trim();
   const city = input.city.trim();
-  const phone = input.phone.trim();
+  const phone = phoneDigits(input.phone);
   const email = input.email.trim().toLowerCase();
 
   if (hotelName.length < 2 || city.length < 2 || phone.length < 10) {

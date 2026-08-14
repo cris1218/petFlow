@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useFeedback } from "@/components/app-feedback";
+import { formatWhatsAppMask } from "@/lib/utils";
 
 export function WhatsAppQrCard({
   connected,
@@ -101,7 +102,7 @@ export function WhatsAppQrCard({
         <CardDescription>
           Escaneie o QR Code da Evolution API com o WhatsApp do hotel.
           Instância: {instanceName}
-          {number ? ` · ${number}` : ""}
+          {number ? ` · ${formatWhatsAppMask(number)}` : ""}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

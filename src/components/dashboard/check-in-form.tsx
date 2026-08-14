@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { AlertTriangle } from "lucide-react";
 import { checkInBooking, checkOutBooking } from "@/actions/bookings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -22,6 +20,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { formatDate } from "@/lib/utils";
+import { BOOKING_STATUS_LABELS, catCareLabels, hasPetCareProfile } from "@/lib/constants";
 import { useFeedback } from "@/components/app-feedback";
 
 export type CheckInBooking = {
@@ -31,7 +30,10 @@ export type CheckInBooking = {
   startDate: Date | string;
   endDate: Date | string;
   status: "CONFIRMED" | "CHECKED_IN" | string;
-  petVaccines: string[];
+  species?: string;
+  castrated?: boolean | null;
+  vaccinated?: boolean | null;
+  aggressive?: boolean | null;
   checklist: Array<{ id: string; itemName: string; quantity: number }>;
 };
 
@@ -39,46 +41,42 @@ type CatalogItem = { id: string; name: string };
 
 export function CheckInForm({
   bookings,
-  belongings,
-  requiredVaccines,
+  belongings = [],
+  mode,
 }: {
   bookings: CheckInBooking[];
-  belongings: CatalogItem[];
-  requiredVaccines: CatalogItem[];
+  belongings?: CatalogItem[];
+  mode: "check-in" | "check-out";
 }) {
   const [bookingId, setBookingId] = useState(bookings[0]?.id ?? "");
   const [items, setItems] = useState(
     belongings.map((item) => ({ itemName: item.name, quantity: 1, enabled: false })),
   );
-  const [hasVaccines, setHasVaccines] = useState<string[]>([]);
   const [customItem, setCustomItem] = useState("");
+  const [returnedIds, setReturnedIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const { success } = useFeedback();
+  const isCheckOut = mode === "check-out";
 
   const selected = bookings.find((booking) => booking.id === bookingId);
-  const missingVaccines = requiredVaccines
-    .map((vaccine) => vaccine.name)
-    .filter((name) => !hasVaccines.includes(name));
+  const allReturned =
+    !selected?.checklist.length ||
+    selected.checklist.every((item) => returnedIds.includes(item.id));
+
+  useEffect(() => {
+    if (!bookings.some((booking) => booking.id === bookingId)) {
+      setBookingId(bookings[0]?.id ?? "");
+    }
+  }, [bookings, bookingId]);
 
   useEffect(() => {
     setItems(
       belongings.map((item) => ({ itemName: item.name, quantity: 1, enabled: false })),
     );
-    const booking = bookings.find((row) => row.id === bookingId);
-    setHasVaccines(booking?.petVaccines ?? []);
     setCustomItem("");
-  }, [bookingId, belongings, bookings]);
-
-  function toggleVaccine(name: string, checked: boolean) {
-    setHasVaccines((current) =>
-      checked
-        ? current.includes(name)
-          ? current
-          : [...current, name]
-        : current.filter((item) => item !== name),
-    );
-  }
+    setReturnedIds([]);
+  }, [bookingId, belongings]);
 
   function submitCheckIn() {
     if (!bookingId) return;
@@ -94,29 +92,29 @@ export function CheckInForm({
             ? [{ itemName: customItem.trim(), quantity: 1 }]
             : []),
         ],
-        vaccineNames: hasVaccines,
       });
       if (!result.ok) {
         setError(result.error);
         return;
       }
-      success(
-        result.missingVaccines.length > 0
-          ? `Check-in salvo. Faltam vacinas: ${result.missingVaccines.join(", ")}.`
-          : "Check-in salvo com sucesso.",
-      );
+      success("Entrada salva com sucesso.");
     });
   }
 
   function submitCheckOut() {
     if (!bookingId) return;
+    if (!allReturned) {
+      setError("Marque todos os pertences devolvidos para liberar a saída.");
+      return;
+    }
     startTransition(async () => {
-      const result = await checkOutBooking(bookingId);
+      setError(null);
+      const result = await checkOutBooking(bookingId, returnedIds);
       if (!result.ok) {
         setError(result.error);
         return;
       }
-      success("Check-out salvo com sucesso.");
+      success("Saída salva com sucesso.");
     });
   }
 
@@ -124,9 +122,13 @@ export function CheckInForm({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Nenhuma reserva ativa</CardTitle>
+          <CardTitle>
+            {isCheckOut ? "Nenhum pet para dar saída" : "Nenhuma reserva para dar entrada"}
+          </CardTitle>
           <CardDescription>
-            Confirme um agendamento para liberar o check-in.
+            {isCheckOut
+              ? "Pets com entrada registrada aparecem aqui até o tutor buscar."
+              : "Confirme um agendamento para liberar a entrada."}
           </CardDescription>
         </CardHeader>
       </Card>
@@ -136,9 +138,11 @@ export function CheckInForm({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Fazer check-in</CardTitle>
+        <CardTitle>{isCheckOut ? "Registrar saída" : "Registrar entrada"}</CardTitle>
         <CardDescription>
-          Marque os pertences que chegaram e as vacinas que o pet tem. Sem data.
+          {isCheckOut
+            ? "Marque cada pertence devolvido ao tutor para liberar a saída."
+            : "Marque os pertences que chegaram com o pet."}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -151,7 +155,10 @@ export function CheckInForm({
             <SelectContent>
               {bookings.map((booking) => (
                 <SelectItem key={booking.id} value={booking.id}>
-                  {booking.petName} · {booking.tutorName} · {booking.status}
+                  {booking.petName} · {booking.tutorName} ·{" "}
+                  {BOOKING_STATUS_LABELS[
+                    booking.status as keyof typeof BOOKING_STATUS_LABELS
+                  ] ?? booking.status}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -159,117 +166,115 @@ export function CheckInForm({
           {selected && (
             <p className="text-xs text-muted-foreground">
               {formatDate(selected.startDate)} até {formatDate(selected.endDate)}
+              {hasPetCareProfile(selected.species)
+                ? ` · ${catCareLabels(selected).join(" · ")}`
+                : ""}
             </p>
           )}
         </div>
 
-        {requiredVaccines.length > 0 && (
+        {!isCheckOut ? (
           <div className="space-y-2">
-            <Label>Vacinas</Label>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {requiredVaccines.map((vaccine) => (
-                <label
-                  key={vaccine.id}
-                  className="flex min-h-11 items-center gap-2 rounded-md border px-3 py-2 text-sm"
-                >
-                  <input
-                    type="checkbox"
-                    checked={hasVaccines.includes(vaccine.name)}
-                    onChange={(event) =>
-                      toggleVaccine(vaccine.name, event.target.checked)
-                    }
-                  />
-                  {vaccine.name}
-                </label>
-              ))}
-            </div>
-            {missingVaccines.length > 0 && (
-              <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                <p>Ainda faltam: {missingVaccines.join(", ")}.</p>
+            <Label>Pertences</Label>
+            {belongings.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Cadastre os pertences acima para marcá-los na entrada.
+              </p>
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {items.map((item, index) => (
+                  <label
+                    key={item.itemName}
+                    className="flex min-h-11 items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
+                  >
+                    <span className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={item.enabled}
+                        onChange={(event) => {
+                          const next = [...items];
+                          next[index] = { ...item, enabled: event.target.checked };
+                          setItems(next);
+                        }}
+                      />
+                      {item.itemName}
+                    </span>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={item.quantity}
+                      className="h-10 w-16"
+                      onChange={(event) => {
+                        const next = [...items];
+                        next[index] = {
+                          ...item,
+                          quantity: Number(event.target.value) || 1,
+                        };
+                        setItems(next);
+                      }}
+                    />
+                  </label>
+                ))}
               </div>
+            )}
+            <Input
+              placeholder="Outro item (ex.: Brinquedo favorito)"
+              value={customItem}
+              onChange={(event) => setCustomItem(event.target.value)}
+            />
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <Label>Pertences para devolver</Label>
+            {selected?.checklist.length ? (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {selected.checklist.map((item) => (
+                  <label
+                    key={item.id}
+                    className="flex min-h-11 items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={returnedIds.includes(item.id)}
+                      onChange={(event) => {
+                        setReturnedIds((current) =>
+                          event.target.checked
+                            ? [...current, item.id]
+                            : current.filter((id) => id !== item.id),
+                        );
+                      }}
+                    />
+                    {item.itemName} × {item.quantity}
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Nenhum pertence foi registrado na entrada.
+              </p>
             )}
           </div>
         )}
 
-        <div className="space-y-2">
-          <Label>Pertences</Label>
-          {belongings.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Cadastre os pertences acima para marcá-los no check-in.
-            </p>
-          ) : (
-            <div className="grid gap-2 sm:grid-cols-2">
-              {items.map((item, index) => (
-                <label
-                  key={item.itemName}
-                  className="flex min-h-11 items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
-                >
-                  <span className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={item.enabled}
-                      onChange={(event) => {
-                        const next = [...items];
-                        next[index] = { ...item, enabled: event.target.checked };
-                        setItems(next);
-                      }}
-                    />
-                    {item.itemName}
-                  </span>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={item.quantity}
-                    className="h-10 w-16"
-                    onChange={(event) => {
-                      const next = [...items];
-                      next[index] = {
-                        ...item,
-                        quantity: Number(event.target.value) || 1,
-                      };
-                      setItems(next);
-                    }}
-                  />
-                </label>
-              ))}
-            </div>
-          )}
-          <Input
-            placeholder="Outro item (ex.: Brinquedo favorito)"
-            value={customItem}
-            onChange={(event) => setCustomItem(event.target.value)}
-          />
-        </div>
-
-        {selected?.checklist.length ? (
-          <div className="flex flex-wrap gap-2">
-            {selected.checklist.map((item) => (
-              <Badge key={item.id} variant="secondary">
-                {item.itemName} × {item.quantity}
-              </Badge>
-            ))}
-          </div>
-        ) : null}
-
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:flex-wrap">
-          <Button
-            className="w-full sm:w-auto"
-            onClick={submitCheckIn}
-            loading={isPending}
-            disabled={selected?.status === "CHECKED_IN"}
-          >
-            {isPending ? "Salvando..." : "Confirmar check-in"}
-          </Button>
-          <Button
-            className="w-full sm:w-auto"
-            variant="outline"
-            onClick={submitCheckOut}
-            loading={isPending}
-            disabled={selected?.status !== "CHECKED_IN"}
-          >
-            {isPending ? "Salvando..." : "Fazer check-out"}
-          </Button>
+          {isCheckOut ? (
+            <Button
+              className="w-full sm:w-auto"
+              onClick={submitCheckOut}
+              loading={isPending}
+              disabled={!allReturned}
+            >
+              {isPending ? "Salvando..." : "Dar saída"}
+            </Button>
+          ) : (
+            <Button
+              className="w-full sm:w-auto"
+              onClick={submitCheckIn}
+              loading={isPending}
+            >
+              {isPending ? "Salvando..." : "Dar entrada"}
+            </Button>
+          )}
         </div>
 
         {error && <p className="text-sm text-destructive">{error}</p>}

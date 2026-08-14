@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, Menu, PawPrint, X, type LucideIcon } from "lucide-react";
+import { LogOut, Menu, X, type LucideIcon } from "lucide-react";
 import { logoutAction } from "@/actions/auth";
 import { useFeedback } from "@/components/app-feedback";
+import { BrandMark } from "@/components/brand-mark";
 import { Button } from "@/components/ui/button";
 import { APP_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -21,11 +22,13 @@ export function AppShell({
   subtitle,
   extra,
   items,
+  logoUrl,
   children,
 }: {
   subtitle: string;
   extra?: React.ReactNode;
   items: AppNavItem[];
+  logoUrl?: string | null;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -102,9 +105,7 @@ export function AppShell({
           <Menu className="h-5 w-5" />
         </button>
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <PawPrint className="h-4 w-4" />
-          </div>
+          <BrandMark logoUrl={logoUrl} size="sm" />
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">{APP_NAME}</p>
             <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
@@ -129,9 +130,7 @@ export function AppShell({
       >
         <div className="flex items-start justify-between gap-2 border-b px-4 py-4">
           <div className="flex min-w-0 items-center gap-2">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <PawPrint className="h-5 w-5" />
-            </div>
+            <BrandMark logoUrl={logoUrl} size="md" />
             <div className="min-w-0">
               <p className="text-sm font-semibold">{APP_NAME}</p>
               <p className="truncate text-xs text-muted-foreground">{subtitle}</p>

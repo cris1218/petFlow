@@ -1,46 +1,34 @@
 import { prisma } from "@/lib/prisma";
 import { requireStaffSession } from "@/lib/auth";
 import { CheckInForm } from "@/components/dashboard/check-in-form";
-import { CheckInCatalogForm } from "@/components/dashboard/check-in-catalog-form";
-import { serializeCatalogItem } from "@/lib/check-in-catalog";
 
 export const dynamic = "force-dynamic";
 
-export default async function CheckInPage() {
+export default async function CheckOutPage() {
   const { tenantId } = await requireStaffSession();
 
-  const [bookings, belongings] = await Promise.all([
-    prisma.booking.findMany({
-      where: {
-        tenantId,
-        status: "CONFIRMED",
-      },
-      include: {
-        pet: { include: { tutor: true } },
-        checklistItems: true,
-      },
-      orderBy: { startDate: "asc" },
-    }),
-    prisma.tenantBelonging.findMany({
-      where: { tenantId },
-      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-    }),
-  ]);
+  const bookings = await prisma.booking.findMany({
+    where: {
+      tenantId,
+      status: "CHECKED_IN",
+    },
+    include: {
+      pet: { include: { tutor: true } },
+      checklistItems: true,
+    },
+    orderBy: { startDate: "asc" },
+  });
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold sm:text-2xl">Entrada</h1>
+        <h1 className="text-xl font-semibold sm:text-2xl">Saída</h1>
         <p className="text-sm text-muted-foreground">
-          Cadastre os pertences e registre o que o tutor trouxe na chegada.
+          Marque os pertences devolvidos para liberar a saída.
         </p>
       </div>
-      <CheckInCatalogForm
-        belongings={belongings.map(serializeCatalogItem)}
-      />
       <CheckInForm
-        mode="check-in"
-        belongings={belongings.map(serializeCatalogItem)}
+        mode="check-out"
         bookings={bookings.map((booking) => ({
           id: booking.id,
           petName: booking.pet.name,
